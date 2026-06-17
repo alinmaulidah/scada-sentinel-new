@@ -51,14 +51,15 @@ function App() {
   ========================= */
 
   useEffect(() => {
-
-    const path = location.pathname.replace("/", "");
-
-    if (path && path !== "login") {
-      setActivePage(path);
-    }
-
-  }, [location]);
+  const path = location.pathname.replace("/", "");
+  
+  // Jika path kosong (halaman utama), set activePage ke "overview"
+  if (!path) {
+    setActivePage("overview");
+  } else if (path !== "login") {
+    setActivePage(path);
+  }
+}, [location]);
 
   /* =========================
      PROTECTED ROUTE

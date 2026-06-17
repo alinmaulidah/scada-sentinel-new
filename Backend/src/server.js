@@ -8,6 +8,8 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const dataRoutes = require("./routes/dataRoutes");
 const algoritmaRoutes = require("./routes/algoritmaRoutes");
 const monitoringRoutes = require("./routes/monitoringRoutes");
+const algorithmResultsRoutes = require("./routes/algorithmResultsRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 
@@ -42,6 +44,12 @@ app.use("/api/algoritma", algoritmaRoutes);
 
 // MONITORING
 app.use("/api/monitoring", monitoringRoutes);
+
+// ALGORITHM RESULTS (CRUD for Monitoring Page)
+app.use("/api/algorithm_results", algorithmResultsRoutes);
+
+// PROFILE
+app.use("/api", profileRoutes);
 
 // ================= SERVER =================
 

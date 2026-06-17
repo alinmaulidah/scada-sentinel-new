@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Database, Activity, BarChart3, 
+  LayoutDashboard, Database, Activity, BarChart3,
   Settings, LogOut, ChevronLeft, ShieldCheck
 } from "lucide-react";
 
@@ -11,29 +11,28 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, setActivePage, onLogin }) 
   const storedUser = localStorage.getItem('user');
   const user = storedUser ? JSON.parse(storedUser) : null;
 
-  // 1. Tambahkan properti 'icon' ke setiap menu
+  // ID Menu di sini harus 100% SAMA dengan properti 'path' di App.jsx
   const allMenuItems = [
-    { 
-      id: "overview", 
-      label: "Dashboard", 
-      icon: <LayoutDashboard size={20} /> 
+    {
+      id: "overview",
+      label: "Dashboard",
+      icon: <LayoutDashboard size={20} />
     },
-    { 
-      id: "datamanagement", 
-      label: "Data Management", 
-      icon: <Database size={20} /> 
+    {
+      id: "datamanagement",
+      label: "Data Management",
+      icon: <Database size={20} />
     },
-    { 
-      id: "algorithmexecution", 
-      label: "Algorithm Execution", 
-      icon: <Activity size={20} /> // Ikon aktivitas untuk eksekusi
+    {
+      id: "algorithmexecution", // Sudah diperbaiki (ditambah huruf 'e' agar sinkron dengan App.jsx)
+      label: "Algorithm Execution",
+      icon: <Activity size={20} />
     },
-    { 
-      id: "monitoring", 
-      label: "Monitoring & Report", 
-      icon: <BarChart3 size={20} /> 
+    {
+      id: "monitoring", // Sudah disinkronkan dengan path="/monitoring" di App.jsx
+      label: "Monitoring & Report",
+      icon: <BarChart3 size={20} />
     },
-    
   ];
 
   const menuItems = allMenuItems.filter(item => {
@@ -89,8 +88,8 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, setActivePage, onLogin }) 
             <button
               key={item.id}
               onClick={() => {
-                setActivePage(item.id);
-                navigate(`/${item.id}`);
+                setActivePage(item.id);     // Mengubah status menu aktif di UI
+                navigate(`/${item.id}`);    // Memicu perpindahan halaman React Router secara aman
               }}
               className={`
                 flex items-center gap-3.5 w-full px-3.5 py-3 rounded-xl 
@@ -101,7 +100,6 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, setActivePage, onLogin }) 
                 }
               `}
             >
-              {/* Render Ikon di sini */}
               <span className={`
                 transition-transform duration-500 
                 ${isActive ? "scale-110" : "group-hover:scale-110"}

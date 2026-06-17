@@ -1,15 +1,19 @@
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
 const path = require("path");
-const db = require("../config/db");
+const db = require("../config/db"); // Import koneksi MySQL pool/promise kamu
 
 // ======================================================
-// PROMISE WRAPPER EXEC (lebih stabil)
+// PROMISE WRAPPER EXECFILE (Aman dari Alokasi Buffer Macet)
 // ======================================================
-const runPython = (command) => {
+const runPythonFile = (scriptPath, args) => {
   return new Promise((resolve, reject) => {
-    exec(
-      command,
-      { timeout: 60000, maxBuffer: 1024 * 1024 * 10 },
+    execFile(
+      "python", 
+      [scriptPath, args],
+      { 
+        timeout: 0,                 // Node.js dilarang mematikan runtime Python secara paksa
+        maxBuffer: 1024 * 1024 * 50 // Buffer 50MB sangat lega menampung array detail log anomali & normal
+      },
       (error, stdout, stderr) => {
         if (error) return reject(error);
         resolve({ stdout, stderr });
@@ -19,18 +23,17 @@ const runPython = (command) => {
 };
 
 // ======================================================
-// EXECUTE ALGORITHM (FINAL VERSION)
+// MAIN CONTROLLER METHOD EXPORT
 // ======================================================
 exports.executeAlgorithm = async (req, res) => {
   try {
     const {
       algorithm,
       normalization,
-      cluster,
       auto_cluster,
     } = req.body;
 
-    // ================= VALIDATION =================
+    // Validation Check
     if (!algorithm || !normalization) {
       return res.status(400).json({
         success: false,
@@ -38,33 +41,45 @@ exports.executeAlgorithm = async (req, res) => {
       });
     }
 
-    const scriptPath = path.join(
-      __dirname,
-      "../scripts/analysis.py"
-    );
+    const scriptPath = path.join(__dirname, "../scripts/analysis.py");
 
     const inputData = JSON.stringify({
       algorithm,
       normalization,
-      cluster,
-      auto_cluster,
+      auto_cluster: auto_cluster !== undefined ? auto_cluster : true,
     });
 
-    const command = `python "${scriptPath}" "${inputData.replace(/"/g, '\\"')}"`;
-
-    // ================= RUN PYTHON =================
-    const { stdout } = await runPython(command);
+    // Jalankan Skrip Python secara aman lewat argumen array langsung
+    const { stdout } = await runPythonFile(scriptPath, inputData);
 
     const lines = stdout.trim().split("\n").filter(Boolean);
     const lastLine = lines[lines.length - 1];
 
-    const results = JSON.parse(lastLine);
+    let results;
+    try {
+      results = JSON.parse(lastLine);
+    } catch (parseErr) {
+      throw new Error(`Gagal parsing JSON output Python. Raw output: ${lastLine}`);
+    }
 
-    // ================= SAFE CAST (IMPORTANT) =================
+    // Antisipasi jika Python melemparkan pesan error internal database/koneksi
+    if (results.error) {
+      return res.status(400).json({
+        success: false,
+        message: "Error di script Python internal",
+        details: results.error
+      });
+    }
+
+    // Utilitas Pengaman Tipe Data Angka
     const safeNumber = (v) =>
-      v === null || v === undefined || v === "" ? 0 : Number(v);
+      v === null || v === undefined || v === "" || isNaN(v) ? 0 : Number(v);
 
-    // ================= SAVE TO DATABASE =================
+    // Utilitas Khusus Kolom DB FLOAT/INT yang Nullable (Agar K-Means tidak memaksakan angka 0 ke kolom EPS/Min Samples)
+    const safeNumberOrNull = (v) =>
+      v === null || v === undefined || v === "" ? null : (isNaN(v) ? 0 : Number(v));
+
+    // Simpan Rekapitulasi Hasil ke Tabel database MySQL
     await db.query(
       `INSERT INTO algorithm_results (
         algorithm,
@@ -85,11 +100,11 @@ exports.executeAlgorithm = async (req, res) => {
         normal_details
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        results.algorithm,
-        results.normalization,
-        results.cluster,
-        results.eps,
-        results.min_samples,
+        results.algorithm || "-",
+        results.normalization || "-",
+        results.cluster || "-",                 // Menyimpan nilai auto cluster dinamis hasil kalkulasi Python (2 s/d 5)
+        safeNumberOrNull(results.eps),         // Tetap NULL jika jalurnya K-Means
+        safeNumberOrNull(results.min_samples), // Tetap NULL jika jalurnya K-Means
         safeNumber(results.anomaly),
         safeNumber(results.normal),
         safeNumber(results.silhouette),
@@ -104,7 +119,7 @@ exports.executeAlgorithm = async (req, res) => {
       ]
     );
 
-    // ================= RESPONSE =================
+    // Kembalikan objek data utuh ke dashboard sistem klien React Frontend
     return res.json({
       success: true,
       ...results,
@@ -115,7 +130,8 @@ exports.executeAlgorithm = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Internal server error saat menjalankan algoritma",
+      details: err.message
     });
   }
 };

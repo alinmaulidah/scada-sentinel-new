@@ -1,7 +1,10 @@
 const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
-  host: 'localhost', user: 'root', password: '', database: 'scada-sentinel'
+  host: 'localhost', 
+  user: 'root', 
+  password: '', 
+  database: 'scada-sentinel' // Pastikan nama DB sesuai dengan setup MySQL-mu
 });
 
 exports.getDashboardStats = async (req, res) => {
@@ -10,9 +13,9 @@ exports.getDashboardStats = async (req, res) => {
     const [totalLogs] = await pool.execute('SELECT COUNT(*) as count FROM sensor_logs');
     const total = totalLogs[0].count || 0;
     
-    // 2. Kirim total ke frontend bersama stats pendukung lainnya
+    // 2. Kirim total ke frontend dengan properti totalRecords
     res.json({
-      totalLogs: total, // <-- Ini yang akan dibaca oleh Button 3 di frontend
+      totalRecords: total, // <-- DIUBAH DI SINI supaya sinkron dengan frontend
       corePoints: Math.floor(total * 0.7).toString(),
       noiseDetected: Math.floor(total * 0.05).toString(),
       ratios: { core: "70%", border: "25%", noise: "5%" }

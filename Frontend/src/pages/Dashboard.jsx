@@ -154,7 +154,7 @@ export default function Dashboard() {
           <div className="p-4 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div className="flex items-center gap-2">
               <HelpCircle size={18} style={{ color: PRIMARY_COLOR }} />
-              <h2 className="text-xs font-black text-slate-800 tracking-wide uppercase">Alur Pemrosesan Komparasi Sistem & Audit Pipeline</h2>
+              <h2 className="text-xs font-black text-slate-800 tracking-wide uppercase">Alur Cara Kerja Sistem</h2>
             </div>
             <button 
               onClick={() => setShowGuide(!showGuide)}
@@ -173,7 +173,7 @@ export default function Dashboard() {
                   { step: 1, label: "1. Data Management", icon: <Database size={13} /> },
                   { step: 2, label: "2. Eksekusi Algoritma", icon: <Settings size={13} /> },
                   { step: 3, label: "3. Monitoring & Report", icon: <FileText size={13} /> },
-                  { step: 4, label: "4. Rangkuman Dashboard", icon: <LayoutDashboard size={13} /> },
+                  { step: 4, label: "4. Dashboard", icon: <LayoutDashboard size={13} /> },
                 ].map((s) => (
                   <button
                     key={s.step}

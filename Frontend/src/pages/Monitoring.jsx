@@ -603,10 +603,10 @@ export default function Monitoring() {
                     }}
                     className="bg-transparent text-xs font-bold text-slate-600 focus:outline-none min-w-[220px]"
                   >
-                    <option value="">Live — Data Terbaru</option>
+                    <option value="">Live Data Terbaru</option>
                     {historyList.map((run) => (
                       <option key={run.id} value={run.id}>
-                        [ID {run.id}] {run.algorithm?.toUpperCase() || "?"} + {getNormLabel(run.normalization)} — {formatDateTimeID(run.created_at)}
+                        [ID {run.id}] {run.algorithm?.toUpperCase() || "?"} + {getNormLabel(run.normalization)} - {formatDateTimeID(run.created_at)}
                       </option>
                     ))}
                   </select>
@@ -629,7 +629,7 @@ export default function Monitoring() {
           {selectedRunId !== null && meta?.executed_at && (
             <p className="mt-2 text-[10px] text-amber-600 font-semibold flex items-center gap-1">
               <History size={10} />
-              Menampilkan data historis sesi #{selectedRunId} — {formatDateLong(meta.executed_at)}
+              Menampilkan data historis sesi #{selectedRunId} - {formatDateLong(meta.executed_at)}
               {" "}
               <button
                 onClick={() => setSelectedRunId(null)}

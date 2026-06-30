@@ -8,13 +8,29 @@ const generateInsightFromData = (item) => {
   const flow = Number(item.flow_rate || 0);
   const temp = Number(item.temperature || 0);
   const speed = Number(item.pump_speed || 0);
-  const type = String(item.type || "normal").toLowerCase();
+  // Hapus default "normal" di sini agar tidak mengacaukan fallback
+  const type = String(item.type || "").toLowerCase(); 
+  const isNormalFromAlgo = item.is_normal_from_algo; // Ambil flag dari controller
 
   // ====================================================================
-  // UTAMAKAN PENGECEKAN KONDISI KRITIS TERLEBIH DAHULU (Ubah Urutan If)
+  // 1. KUNCI UTAMA: Pengecekan Normal Paling Atas
+  // ====================================================================
+  // Jika data murni berasal dari array normal algoritma, jangan ditimpa!
+  if (isNormalFromAlgo || type === "normal") {
+    return {
+      prediction: "Normal",
+      severity: "Safe",
+      reason: "Seluruh parameter sensor berada pada rentang operasional safe-zone standar Pertamina.",
+      impact: "Sistem distribusi pipa berjalan stabil tanpa indikasi fluktuasi anomali.",
+      solution: "Lanjutkan monitoring berkala, pengisian logbook harian, dan preventive maintenance sesuai jadwal."
+    };
+  }
+
+  // ====================================================================
+  // PENGECEKAN KONDISI KRITIS (Hanya dieksekusi jika data terdeteksi Anomali)
   // ====================================================================
 
-  // 1. Kasus LEAK (Kebocoran)
+  // 2. Kasus LEAK (Kebocoran)
   if (type === "leak" || (pressure < 2.5 && flow > 8.0)) {
     return {
       prediction: "Leak",
@@ -25,7 +41,7 @@ const generateInsightFromData = (item) => {
     };
   }
 
-  // 2. Kasus SURGE (Tekanan Kejut)
+  // 3. Kasus SURGE (Tekanan Kejut)
   if (type === "surge" || (pressure > 5.5 && speed > 1600)) {
     return {
       prediction: "Surge",
@@ -36,7 +52,7 @@ const generateInsightFromData = (item) => {
     };
   }
 
-  // 3. Kasus BLOCKAGE (Penyumbatan)
+  // 4. Kasus BLOCKAGE (Penyumbatan)
   if (type === "blockage" || (pressure > 4.5 && flow < 3.0)) {
     return {
       prediction: "Blockage",
@@ -47,7 +63,7 @@ const generateInsightFromData = (item) => {
     };
   }
 
-  // 4. Kasus DEGRADATION (Penurunan Kinerja Pompa)
+  // 5. Kasus DEGRADATION (Penurunan Kinerja Pompa)
   if (type === "degradation" || temp > 65.0 || (speed > 1500 && flow < 6.0)) {
     return {
       prediction: "Degradation",
@@ -58,18 +74,7 @@ const generateInsightFromData = (item) => {
     };
   }
 
-  // 5. Kasus NORMAL (Ditaruh di bawah agar tidak mengunci status anomali)
-  if (type === "normal") {
-    return {
-      prediction: "Normal",
-      severity: "Safe",
-      reason: "Seluruh parameter sensor berada pada rentang operasional safe-zone standar Pertamina.",
-      impact: "Sistem distribusi pipa berjalan stabil tanpa indikasi fluktuasi anomali.",
-      solution: "Lanjutkan monitoring berkala, pengisian logbook harian, dan preventive maintenance sesuai jadwal."
-    };
-  }
-
-  // Fallback Default jika tidak masuk kategori manapun
+  // Fallback Default jika tidak masuk kategori fisis manapun
   return {
     prediction: "Anomaly",
     severity: "Medium",
@@ -84,7 +89,6 @@ const generateInsightFromData = (item) => {
 // ============================================
 const getMonitoringData = async (req, res) => {
   try {
-    // Ambil hasil eksekusi algoritma paling terbaru (Latest Run)
     const query = `
       SELECT 
         id, algorithm, normalization, cluster, eps, min_samples,
@@ -96,7 +100,6 @@ const getMonitoringData = async (req, res) => {
       LIMIT 1
     `;
 
-    // Gunakan promise-based API (db adalah promise pool)
     const [result] = await db.query(query);
 
     if (!result || result.length === 0) {
@@ -110,20 +113,21 @@ const getMonitoringData = async (req, res) => {
 
     const latestRun = result[0];
 
-    // Parse text string JSON dari database menjadi array objek Javascript asli
     let anomalies = [];
     let normals = [];
     try { anomalies = JSON.parse(latestRun.anomaly_details || "[]"); } catch(e) { anomalies = []; }
     try { normals = JSON.parse(latestRun.normal_details || "[]"); } catch(e) { normals = []; }
 
-    // Gabungkan semua baris detail untuk dipetakan ke komponen tabel dashboard UI
-    const allLogs = [...anomalies, ...normals];
+    // BUBBUHKAN FLAG: Agar fungsi insight tahu mana data yang asli Normal dari algoritma
+    const taggedAnomalies = anomalies.map(item => ({ ...item, is_normal_from_algo: false }));
+    const taggedNormals = normals.map(item => ({ ...item, is_normal_from_algo: true }));
+
+    // Gabungkan semua baris detail
+    const allLogs = [...taggedAnomalies, ...taggedNormals];
 
     const formattedData = allLogs.map((item) => {
-      // Suntikkan teks solusi, alasan fisis, dan severity berdasarkan fungsi pembobotan hibrida
       const insightFallback = generateInsightFromData(item);
 
-      // Prioritaskan tipe hasil prediksi dari fungsi insight yang sudah dievaluasi ulang
       const rawType = insightFallback.prediction || item.type || "Anomaly";
       const displayType = rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase();
 
@@ -144,7 +148,6 @@ const getMonitoringData = async (req, res) => {
       };
     });
 
-    // Kembalikan response lengkap beserta metrik akurasi untuk komponen statistik dashboard
     return res.status(200).json({
       success: true,
       meta: {

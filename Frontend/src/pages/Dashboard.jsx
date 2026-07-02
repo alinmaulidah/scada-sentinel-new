@@ -222,7 +222,7 @@ export default function Dashboard() {
                       <span className="text-[9px] bg-purple-50 text-purple-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-purple-100">Tahap Modeling</span>
                       <h3 className="text-xs font-bold text-slate-800">Komparasi Metode Pengelompokan Klaster</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Sistem melakukan ekstraksi matematis pada 4 kluster parameter fisis utama. Matriks ini ditransformasi menggunakan normalisasi skala jarak sebelum diproses ke dalam model <b>K-Means Clustering</b> (berbasis *Centroid Distance*) atau <b>DBSCAN</b> (berbasis *Density Neighborhood*):
+                        Sistem melakukan ekstraksi matematis pada 4 kluster parameter fisis utama. Matriks ini ditransformasi menggunakan normalisasi skala jarak sebelum diproses ke dalam model <b>K-Means Clustering</b> (berbasis Centroid Distance) atau <b>DBSCAN</b> (berbasis Density Neighborhood):
                       </p>
                       
                       <div className="flex flex-wrap gap-1.5 py-1">
@@ -244,7 +244,7 @@ export default function Dashboard() {
                       <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-emerald-100">Tahap Audit</span>
                       <h3 className="text-xs font-bold text-slate-800">Isolasi Tabular & Eksportasi Dokumen Cetak</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Melalui menu <b>Monitoring & Report</b>, validator/operator dapat melacak letak indeks baris data anomali secara presisi. Record tersebut dapat diisolasi berdasarkan klaster deviasinya dan diunduh langsung menjadi berkas laporan laporan fisik **PDF Cetak** untuk kebutuhan dokumentasi lapangan.
+                        Melalui menu <b>Monitoring & Report</b>, validator/operator dapat melacak letak indeks baris data anomali secara presisi. Record tersebut dapat diisolasi berdasarkan klaster deviasinya dan diunduh langsung menjadi berkas laporan laporan fisik PDF Cetak untuk kebutuhan dokumentasi lapangan.
                       </p>
                     </div>
                   )}
@@ -255,7 +255,7 @@ export default function Dashboard() {
                       <span className="text-[9px] bg-orange-50 text-orange-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-orange-100">Tahap Rekapitulasi</span>
                       <h3 className="text-xs font-bold text-slate-800">Penetapan Konfigurasi Model Terbaik di Dashboard</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Halaman ini secara otomatis menyeleksi hasil kalkulasi dengan **Silhouette Score tertinggi** sebagai acuan utama. Hasil keputusan ini disalurkan ke dalam grafik sebaran serta modul **AI Advisor** untuk melahirkan saran teknis preventif yang objektif.
+                        Halaman ini secara otomatis menyeleksi hasil kalkulasi dengan Silhouette Score tertinggi sebagai acuan utama. Hasil keputusan ini disalurkan ke dalam grafik sebaran serta modul AI Advisor untuk melahirkan saran teknis preventif yang objektif.
                       </p>
                     </div>
                   )}
@@ -419,7 +419,7 @@ export default function Dashboard() {
             <div className={`p-3.5 rounded-xl border ${best?.anomaly > 0 ? "bg-red-50/40 border-red-100" : "bg-slate-50 border-slate-200/80"}`}>
               <h3 style={{ color: PRIMARY_COLOR }} className="text-[10px] font-black uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 {best?.anomaly > 0 ? <ShieldAlert size={12} className="text-red-500" /> : <CheckCircle2 size={12} className="text-emerald-500" />}
-                ⚡ Sentinel AI Advisor
+                 Sentinel AI Advisor
               </h3>
               <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
                 {aiInsight || "Menunggu kalkulasi evaluasi matriks algoritma untuk menyusun rekomendasi..."}

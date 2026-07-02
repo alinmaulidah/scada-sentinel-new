@@ -154,30 +154,42 @@ const generateInsightLocal = (item, typeStr) => {
   const s = Number(item.pump_speed || 0);
   const type = String(item.type || typeStr || "normal").toLowerCase();
 
-  if (type === "leak" || (p < 2.5 && f > 8.0)) return {
-    prediction: "Leak", severity: "High",
+  if (type === "leak" || typeStr === "Leak") {
+    return {
+    prediction: "Leak", 
+    severity: "High",
     reason: `Tekanan drop kritis (${p.toFixed(2)} Bar), aliran tinggi (${f.toFixed(1)} m\u00B3/h). Hilangnya back-pressure fluida akibat kebocoran dinding pipa.`,
     impact: "Risiko kehilangan volume komoditas, pencemaran lingkungan, kegagalan pasokan hilir.",
     solution: "Isolasi block-valve terdekat, kecilkan RPM pompa, kerahkan tim mekanis lapangan.",
   };
-  if (type === "surge" || (p > 5.5 && s > 1600)) return {
-    prediction: "Surge", severity: "High",
-    reason: `Lonjakan tekanan masif (${p.toFixed(2)} Bar) & RPM tinggi (${s} RPM). Efek Water Hammer akibat penutupan katup mendadak.`,
-    impact: "Tekanan melampaui batas MAOP, risiko deformasi plastis atau pipa pecah.",
-    solution: "Ramp-down RPM segera, buka bypass valve darurat, periksa surge relief system.",
-  };
-  if (type === "blockage" || (p > 4.5 && f < 3.0)) return {
-    prediction: "Blockage", severity: "High",
-    reason: `Tekanan hulu naik (${p.toFixed(2)} Bar) tapi aliran buntu (${f.toFixed(1)} m\u00B3/h). Akumulasi endapan atau malfungsi katup kontrol.`,
-    impact: "Hambatan mekanis total di dalam pipa, risiko kerusakan pompa.",
-    solution: "Lakukan Pigging operation segera dan bersihkan pipa secara menyeluruh.",
-  };
-  if (type === "degradation" || t > 65.0 || (s > 1500 && f < 6.0)) return {
-    prediction: "Degradation", severity: "Medium",
-    reason: `Suhu operasional tinggi (${t.toFixed(1)}\u00B0C) atau pompa kerja keras (${s} RPM) dengan yield aliran rendah.`,
-    impact: "Penurunan efisiensi termal/mekanis komponen, risiko kerusakan bearing.",
-    solution: "Re-greasing bearing penggerak, cek heat exchanger, kalibrasi ulang instrumen.",
-  };
+}
+  if (type === "surge" || typeStr === "Surge") {
+    return {
+      prediction: "Surge",
+      severity: "High",
+      reason: `Lonjakan tekanan masif (${p.toFixed(2)} Bar) & RPM tinggi (${s} RPM). Efek Water Hammer akibat penutupan katup mendadak.`,
+      impact: "Tekanan melampaui batas MAOP, risiko deformasi plastis atau pipa pecah.",
+      solution: "Ramp-down RPM segera, buka bypass valve darurat, periksa surge relief system.",
+    };
+  }
+  if (type === "blockage" || typeStr === "Blockage") {
+    return {
+      prediction: "Blockage",
+      severity: "High",
+      reason: `Tekanan hulu naik (${p.toFixed(2)} Bar) tapi aliran buntu (${f.toFixed(1)} m\u00B3/h). Akumulasi endapan atau malfungsi katup kontrol.`,
+      impact: "Hambatan mekanis total di dalam pipa, risiko kerusakan pompa.",
+      solution: "Lakukan Pigging operation segera dan bersihkan pipa secara menyeluruh.",
+    };
+  }
+  if (type === "degradation" || typeStr === "Degradation") {
+    return {
+      prediction: "Degradation",
+      severity: "Medium",
+      reason: `Suhu operasional tinggi (${t.toFixed(1)}\u00B0C) atau pompa kerja keras (${s} RPM) dengan yield aliran rendah.`,
+      impact: "Penurunan efisiensi termal/mekanis komponen, risiko kerusakan bearing.",
+      solution: "Re-greasing bearing penggerak, cek heat exchanger, kalibrasi ulang instrumen.",
+    };
+  }
   if (type === "normal") return {
     prediction: "Normal", severity: "Safe",
     reason: "Seluruh parameter sensor berada pada rentang operasional safe-zone standar.",
@@ -516,8 +528,7 @@ export default function Monitoring() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h1 className="text-base font-black text-slate-800 flex items-center gap-1.5">
-              <Activity size={16} style={{ color: PRIMARY_COLOR }} />
-              Monitoring System
+               
             </h1>
             <p className="text-[11px] text-slate-400 font-semibold mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>Total Data: <span className="text-slate-700 font-bold">{stats.total} entries</span></span>
@@ -606,7 +617,7 @@ export default function Monitoring() {
                     <option value="">Live Data Terbaru</option>
                     {historyList.map((run) => (
                       <option key={run.id} value={run.id}>
-                        [ID {run.id}] {run.algorithm?.toUpperCase() || "?"} + {getNormLabel(run.normalization)} - {formatDateTimeID(run.created_at)}
+                        [ID {run.id}] {run.algorithm?.toUpperCase() || "?"} + {getNormLabel(run.normalization)} {formatDateTimeID(run.created_at)}
                       </option>
                     ))}
                   </select>
@@ -629,7 +640,7 @@ export default function Monitoring() {
           {selectedRunId !== null && meta?.executed_at && (
             <p className="mt-2 text-[10px] text-amber-600 font-semibold flex items-center gap-1">
               <History size={10} />
-              Menampilkan data historis sesi #{selectedRunId} - {formatDateLong(meta.executed_at)}
+              {selectedRunId} - {formatDateLong(meta.executed_at)}
               {" "}
               <button
                 onClick={() => setSelectedRunId(null)}

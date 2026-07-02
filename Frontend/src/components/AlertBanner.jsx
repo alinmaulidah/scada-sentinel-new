@@ -140,7 +140,7 @@ export default function AlertBanner({ logs = [] }) {
           <div className={cfg.text}>
             <p className="text-sm font-black leading-tight">
               {hasCritical
-                ? `PERINGATAN KRITIS — ${criticalLogs.length} Insiden Aktif`
+                ? `PERINGATAN KRITIS - ${criticalLogs.length} Insiden Aktif`
                 : `PERHATIAN — ${mediumLogs.length} Insiden Sedang`}
             </p>
             <p className="text-[11px] opacity-90 mt-0.5">

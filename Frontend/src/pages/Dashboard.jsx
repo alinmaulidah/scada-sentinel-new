@@ -416,8 +416,10 @@ const formatted = jsonAlgo.map((d, i) => ({
       Davies-Bouldin
     </span>
     <span className="font-black text-indigo-600 font-mono text-sm">
-      {best.dbi ? best.dbi.toFixed(3) : "N/A"}
-    </span>
+{best.dbi !== undefined && best.dbi !== null
+  ? best.dbi.toFixed(3)
+  : "N/A"}
+      </span>
   </div>
   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
     <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">
@@ -506,7 +508,9 @@ const formatted = jsonAlgo.map((d, i) => ({
     {(d.score).toFixed(3)}
   </td>
   <td className="p-4 text-right pr-5 font-black text-indigo-600 font-mono text-xs">
-    {d.dbi ? d.dbi.toFixed(3) : "N/A"}
+{d.dbi !== undefined && d.dbi !== null
+  ? d.dbi.toFixed(3)
+  : "N/A"}
   </td>
                     </tr>
                   ))

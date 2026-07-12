@@ -286,10 +286,6 @@ export default function Monitoring() {
           metrics: {
             silhouette: run.silhouette,
             davies_bouldin: run.davies_bouldin,
-            accuracy: run.accuracy,
-            precision: run.precision_score,
-            recall: run.recall_score,
-            f1_score: run.f1_score,
           },
           summary: {
             total_anomaly: run.anomaly,
@@ -933,34 +929,57 @@ export default function Monitoring() {
         {/* ================================================================
             V. FOOTER: METRIK AKURASI ALGORITMA (TAMBAHAN SKRIPSI)
             ================================================================ */}
-        {meta?.metrics && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <h2 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Activity size={12} style={{ color: PRIMARY_COLOR }} />
-              Metrics Akurasi — {meta.algorithm?.toUpperCase() || "Algorithm"}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[
-                { label: "Silhouette", val: meta.metrics.silhouette, color: "text-indigo-600", bg: "bg-indigo-50" },
-                { label: "Davies-Bouldin", val: meta.metrics.davies_bouldin, color: "text-purple-600", bg: "bg-purple-50" },
-                { label: "Accuracy", val: meta.metrics.accuracy, color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: "Precision", val: meta.metrics.precision, color: "text-cyan-600", bg: "bg-cyan-50" },
-                { label: "Recall", val: meta.metrics.recall, color: "text-blue-600", bg: "bg-blue-50" },
-                { label: "F1-Score", val: meta.metrics.f1_score, color: "text-amber-600", bg: "bg-amber-50" },
-              ].map((m) => (
-                <div
-                  key={m.label}
-                  className={`${m.bg} rounded-lg p-3 text-center border border-gray-100`}
-                >
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">{m.label}</p>
-                  <p className={`text-base font-black ${m.color} tabular-nums`}>
-                    {m.val != null ? Number(m.val).toFixed(4) : "—"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {meta?.metrics && (
+  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+    <h2 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+      <Activity size={12} style={{ color: PRIMARY_COLOR }} />
+      Metrik Evaluasi Clustering — {meta.algorithm?.toUpperCase() || "Algorithm"}
+    </h2>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {[
+        { 
+          label: "Silhouette Score", 
+          val: meta.metrics.silhouette, 
+          color: "text-indigo-600", 
+          bg: "bg-indigo-50",
+          note: "Semakin tinggi semakin baik (maks. +1)"
+        },
+        { 
+          label: "Davies-Bouldin Index", 
+          val: meta.metrics.davies_bouldin, 
+          color: "text-purple-600", 
+          bg: "bg-purple-50",
+          note: "Semakin rendah semakin baik (min. 0)"
+        },
+        { 
+          label: "Total Klaster", 
+          val: meta.cluster, 
+          color: "text-blue-600", 
+          bg: "bg-blue-50",
+          note: "Jumlah klaster terbentuk"
+        },
+        { 
+          label: "Total Anomali", 
+          val: meta.summary?.total_anomaly, 
+          color: "text-red-500", 
+          bg: "bg-red-50",
+          note: "Data teridentifikasi anomali"
+        },
+      ].map((m) => (
+        <div
+          key={m.label}
+          className={`${m.bg} rounded-lg p-3 text-center border border-gray-100`}
+        >
+          <p className="text-[10px] font-bold text-slate-400 uppercase">{m.label}</p>
+          <p className={`text-base font-black ${m.color} tabular-nums`}>
+            {m.val != null ? Number(m.val).toFixed(3) : "—"}
+          </p>
+          <p className="text-[9px] text-slate-400 mt-0.5">{m.note}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
       </div>
     </div>

@@ -47,13 +47,15 @@ export default function Dashboard() {
       const resAlgo = await axios.get(`${API}/algoritma/results`);
       const jsonAlgo = resAlgo.data || [];
 
-      const formatted = jsonAlgo.map((d, i) => ({
-        id: i + 1,
-        algorithm: d.algorithm,
-        normalization: d.normalization,
-        anomaly: Number(d.anomaly || 0),
-        score: d.silhouette,
-      }));
+      // KODE BARU — tambahkan davies_bouldin
+const formatted = jsonAlgo.map((d, i) => ({
+  id: i + 1,
+  algorithm: d.algorithm,
+  normalization: d.normalization,
+  anomaly: Number(d.anomaly || 0),
+  score: d.silhouette,
+  dbi: Number(d.davies_bouldin || 0), // tambahkan ini
+}));
       setData(formatted);
 
       const resScada = await axios.get(`${API}/scada-data?page=1&limit=1`);
@@ -400,16 +402,32 @@ export default function Dashboard() {
                     <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">Prapemrosesan Fitur</span>
                     <span className="font-bold text-slate-700">{best.normalization} Normalization</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
-                      <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">Silhouette Score</span>
-                      <span className="font-black text-blue-600 font-mono text-sm">{(best.score).toFixed(3)}</span>
-                    </div>
-                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
-                      <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">Outliers/Noise</span>
-                      <span className={`font-black font-mono text-sm ${best.anomaly > 0 ? "text-red-500" : "text-slate-700"}`}>{best.anomaly} Pts</span>
-                    </div>
-                  </div>
+<div className="grid grid-cols-3 gap-2 text-xs">
+  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+    <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">
+      Silhouette Score
+    </span>
+    <span className="font-black text-blue-600 font-mono text-sm">
+      {(best.score).toFixed(3)}
+    </span>
+  </div>
+  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+    <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">
+      Davies-Bouldin
+    </span>
+    <span className="font-black text-indigo-600 font-mono text-sm">
+      {best.dbi ? best.dbi.toFixed(3) : "N/A"}
+    </span>
+  </div>
+  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+    <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">
+      Outliers/Noise
+    </span>
+    <span className={`font-black font-mono text-sm ${best.anomaly > 0 ? "text-red-500" : "text-slate-700"}`}>
+      {best.anomaly} Pts
+    </span>
+  </div>
+</div>
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 italic mt-4">Belum ada riwayat komparasi yang terekam di sistem database.</p>
@@ -458,31 +476,38 @@ export default function Dashboard() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider border-b border-slate-200/60">
-                <tr>
-                  <th className="p-4 pl-5">Algoritma & Model Setup</th>
-                  <th className="p-4">Normalisasi Fitur</th>
-                  <th className="p-4 text-center">Deteksi Anomali / Outliers</th>
-                  <th className="p-4 text-right pr-5">Silhouette Validation Score</th>
-                </tr>
-              </thead>
+<thead className="bg-slate-50 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider border-b border-slate-200/60">
+  <tr>
+    <th className="p-4 pl-5">Algoritma & Model Setup</th>
+    <th className="p-4">Normalisasi Fitur</th>
+    <th className="p-4 text-center">Deteksi Anomali</th>
+    <th className="p-4 text-center">Silhouette Score ↑</th>
+    <th className="p-4 text-right pr-5">Davies-Bouldin ↓</th>
+  </tr>
+</thead>
               <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
                 {sorted.length > 0 ? (
                   sorted.map((d, i) => (
-                    <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-4 pl-5 font-bold text-slate-800 flex items-center gap-2">
-                        {d.algorithm}
-                        {i === 0 && (
-                          <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-2 py-0.5 rounded border border-emerald-200">
-                            OPTIMAL CONFIG
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-slate-500 font-mono">{d.normalization}</td>
-                      <td className="p-4 text-center font-bold text-red-500 font-mono">{d.anomaly} Pts</td>
-                      <td className="p-4 text-right pr-5 font-black text-slate-800 font-mono text-xs">
-                        {(d.score).toFixed(3)}
-                      </td>
+                    // KODE BARU — tambahkan kolom DBI di setiap baris
+<tr key={i} className="hover:bg-slate-50/80 transition-colors">
+  <td className="p-4 pl-5 font-bold text-slate-800 flex items-center gap-2">
+    {d.algorithm}
+    {i === 0 && (
+      <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-2 py-0.5 rounded border border-emerald-200">
+        OPTIMAL CONFIG
+      </span>
+    )}
+  </td>
+  <td className="p-4 text-slate-500 font-mono">{d.normalization}</td>
+  <td className="p-4 text-center font-bold text-red-500 font-mono">
+    {d.anomaly} Pts
+  </td>
+  <td className="p-4 text-center font-black text-blue-600 font-mono text-xs">
+    {(d.score).toFixed(3)}
+  </td>
+  <td className="p-4 text-right pr-5 font-black text-indigo-600 font-mono text-xs">
+    {d.dbi ? d.dbi.toFixed(3) : "N/A"}
+  </td>
                     </tr>
                   ))
                 ) : (

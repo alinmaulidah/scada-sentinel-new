@@ -174,18 +174,13 @@ function Login({ onLogin }) {
 
             </div>
 
-            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#336B87]">
-              Industry 5.0 Monitoring
-            </p>
+            
 
             <h1 className="text-3xl font-black text-slate-800 tracking-tight mt-2">
               Pipe Analytica
             </h1>
 
-            <p className="text-sm text-slate-400 mt-2 text-center leading-relaxed">
-              Smart SCADA anomaly detection system
-              for leak & blockage monitoring
-            </p>
+            
 
           </div>
 
@@ -370,12 +365,6 @@ function Login({ onLogin }) {
           {/* FOOTER */}
 
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-
-              SCADA PIPELINE MONITORING • INDUSTRY 5.0
-
-            </p>
 
           </div>
 

@@ -42,13 +42,7 @@ const DataManagement = () => {
       try {
         setLoading(true);
         const wb = XLSX.read(evt.target.result, { type: "array" });
-const json = XLSX.utils.sheet_to_json(
-  wb.Sheets[wb.SheetNames[0]],
-  {
-    defval: "",
-    raw: false,
-  }
-);        
+        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         await axios.post(`${API}/import-scada`, { data: json });
         alert("Data master SCADA berhasil diimport ke database!");
         setPage(1);

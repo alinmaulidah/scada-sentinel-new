@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import React, { useCallback, useEffect, useState } from "react";
+import api from "../lib/api";
 import * as XLSX from "xlsx";
 import { Upload, Database, Search, ChevronLeft, ChevronRight, Trash2, AlertTriangle, CheckCircle } from "lucide-react";
 
-const API = "http://localhost:5000/api";
 const PRIMARY_COLOR = "#336B87"; 
 
 const DataManagement = () => {
@@ -14,10 +13,10 @@ const DataManagement = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [search, setSearch] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API}/scada-data?page=${page}&limit=10&search=${search}`);
+      const res = await api.get("/scada-data", { params: { page, limit: 10, search } });
       setData(res.data.results || []);
       setTotalPages(res.data.totalPages || 1);
       setTotalRecords(res.data.totalRecords || 0);
@@ -26,12 +25,12 @@ const DataManagement = () => {
     } finally { 
       setLoading(false); 
     }
-  };
+  }, [page, search]);
 
   useEffect(() => {
     const delay = setTimeout(fetchData, 300);
     return () => clearTimeout(delay);
-  }, [page, search]);
+  }, [fetchData]);
 
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -43,7 +42,7 @@ const DataManagement = () => {
         setLoading(true);
         const wb = XLSX.read(evt.target.result, { type: "array" });
         const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        await axios.post(`${API}/import-scada`, { data: json });
+        await api.post("/import-scada", { data: json });
         alert("Data master SCADA berhasil diimport ke database!");
         setPage(1);
         fetchData();
@@ -62,7 +61,7 @@ const DataManagement = () => {
     if (!window.confirm("PERINGATAN AKADEMIS: Apakah Anda yakin ingin menghapus SELURUH log data sensor di database? Tindakan ini tidak dapat dibatalkan.")) return;
     try {
       setLoading(true);
-      await axios.delete(`${API}/clear-sensor-logs`);
+      await api.delete("/clear-sensor-logs");
       setPage(1);
       setData([]);
       setTotalRecords(0);

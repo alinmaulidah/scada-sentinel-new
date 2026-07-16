@@ -19,7 +19,17 @@ import {
   History,
   Layers,
 } from "lucide-react";
-import axios from "axios";
+import {
+  getLatestMonitoring,
+  getMonitoringHistory,
+  getMonitoringRun,
+} from "../features/monitoring/monitoring.api";
+import {
+  PER_PAGE,
+  PRIMARY_COLOR,
+  REFRESH_INTERVAL,
+  SPARKLINE_WINDOW,
+} from "../features/monitoring/monitoring.constants";
 
 // ==================== KOMPONEN MODULAR ====================
 import SparklineChart from "../components/SparklineChart";
@@ -35,12 +45,6 @@ import QuickFilterCards from "../components/QuickFilterCards";
 // Lihat fungsi handleExportPDF di bawah.
 
 // ==================== KONSTANTA ====================
-const API_BASE = "http://localhost:5000/api";
-const REFRESH_INTERVAL = 15000; // dinaikkan dari 10s -> 15s untuk kurangi beban CPU/RAM saat live-refresh
-const PRIMARY_COLOR = "#336B87";
-const SPARKLINE_WINDOW = 5;
-const PER_PAGE = 20; // OPTIMASI UTAMA: batasi jumlah baris yang di-render sekaligus
-
 // ==================== THRESHOLD SET-POINTS (MAOP & Standar Operasi) ====================
 const THRESHOLDS = {
   pressure:    { min: 0, max: 8.0, safeMax: 4.0, warnMax: 5.5, unit: "Bar" },
@@ -162,66 +166,13 @@ const getNormLabel = (norm) => {
   return NORM_LABELS[key] || norm;
 };
 
-/**
- * Generate insight dari data anomali secara lokal (untuk data history
- * yang tidak menyertakan field `insight` dari backend /api/monitoring).
- */
-const generateInsightLocal = (item, typeStr) => {
-  const p = Number(item.pressure || 0);
-  const f = Number(item.flow_rate || 0);
-  const t = Number(item.temperature || 0);
-  const s = Number(item.pump_speed || 0);
-  const type = String(item.type || typeStr || "normal").toLowerCase();
-
-  if (type === "leak" || typeStr === "Leak") {
-    return {
-    prediction: "Leak", 
-    severity: "High",
-    reason: `Tekanan drop kritis (${p.toFixed(2)} Bar), aliran tinggi (${f.toFixed(1)} m\u00B3/h). Hilangnya back-pressure fluida akibat kebocoran dinding pipa.`,
-    impact: "Risiko kehilangan volume komoditas, pencemaran lingkungan, kegagalan pasokan hilir.",
-    solution: "Isolasi block-valve terdekat, kecilkan RPM pompa, kerahkan tim mekanis lapangan.",
-  };
-}
-  if (type === "surge" || typeStr === "Surge") {
-    return {
-      prediction: "Surge",
-      severity: "High",
-      reason: `Lonjakan tekanan masif (${p.toFixed(2)} Bar) & RPM tinggi (${s} RPM). Efek Water Hammer akibat penutupan katup mendadak.`,
-      impact: "Tekanan melampaui batas MAOP, risiko deformasi plastis atau pipa pecah.",
-      solution: "Ramp-down RPM segera, buka bypass valve darurat, periksa surge relief system.",
-    };
-  }
-  if (type === "blockage" || typeStr === "Blockage") {
-    return {
-      prediction: "Blockage",
-      severity: "High",
-      reason: `Tekanan hulu naik (${p.toFixed(2)} Bar) tapi aliran buntu (${f.toFixed(1)} m\u00B3/h). Akumulasi endapan atau malfungsi katup kontrol.`,
-      impact: "Hambatan mekanis total di dalam pipa, risiko kerusakan pompa.",
-      solution: "Lakukan Pigging operation segera dan bersihkan pipa secara menyeluruh.",
-    };
-  }
-  if (type === "degradation" || typeStr === "Degradation") {
-    return {
-      prediction: "Degradation",
-      severity: "Medium",
-      reason: `Suhu operasional tinggi (${t.toFixed(1)}\u00B0C) atau pompa kerja keras (${s} RPM) dengan yield aliran rendah.`,
-      impact: "Penurunan efisiensi termal/mekanis komponen, risiko kerusakan bearing.",
-      solution: "Re-greasing bearing penggerak, cek heat exchanger, kalibrasi ulang instrumen.",
-    };
-  }
-  if (type === "normal") return {
-    prediction: "Normal", severity: "Safe",
-    reason: "Seluruh parameter sensor berada pada rentang operasional safe-zone standar.",
-    impact: "Sistem distribusi pipa berjalan stabil tanpa indikasi fluktuasi anomali.",
-    solution: "Lanjutkan monitoring berkala dan preventive maintenance sesuai jadwal.",
-  };
-  return {
-    prediction: "Anomaly", severity: "Medium",
-    reason: "Deviasi parameter telemetri berada di luar batas kerapatan densitas klaster normal (DBSCAN Noise).",
-    impact: "Ketidakstabilan transisi operasional atau potensi malfungsi sensor instrumen.",
-    solution: "Pantau visualisasi tren grafik dalam 1 jam ke depan dan validasi silang data.",
-  };
-};
+const createMissingInsight = () => ({
+  prediction: "Anomaly",
+  severity: "Medium",
+  reason: "Insight dari server tidak tersedia untuk riwayat ini.",
+  impact: "Perlu validasi ulang data monitoring.",
+  solution: "Jalankan analisis ulang untuk memperoleh insight dari server.",
+});
 
 /* ================================================================
    LOG ROW — dipisah jadi komponen sendiri + React.memo
@@ -411,9 +362,7 @@ export default function Monitoring() {
   // ==================== FETCH HISTORY LIST (sekali saat mount) ====================
   const fetchHistoryList = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API_BASE}/algorithm_results`);
-      const runs = data?.data || data || [];
-      setHistoryList(runs);
+      setHistoryList(await getMonitoringHistory());
     } catch (err) {
       console.warn("Gagal fetch history list:", err.message);
     }
@@ -425,16 +374,12 @@ export default function Monitoring() {
 
   // ==================== FETCH DATA UTAMA ====================
   const fetchLatestMonitoring = useCallback(async () => {
-    const { data } = await axios.get(`${API_BASE}/monitoring`);
-    return { responseData: data?.data || [], responseMeta: data?.meta || null };
+    const { logs, meta } = await getLatestMonitoring();
+    return { responseData: logs, responseMeta: meta };
   }, []);
 
   const fetchHistoryRunData = useCallback(async (runId) => {
-    const { data } = await axios.get(`${API_BASE}/algorithm_results`);
-    const runs = data?.data || data || [];
-    const found = runs.find((r) => Number(r.id) === Number(runId));
-    if (!found) throw new Error("Riwayat tidak ditemukan");
-    return found;
+    return getMonitoringRun(runId);
   }, []);
 
   // Helper: build objek log entry
@@ -532,7 +477,13 @@ export default function Monitoring() {
 
         const logs = allItems.map((item, idx) => {
           const segId = item.segment_id || `seg-${idx}`;
-          const insight = generateInsightLocal(item, item._type || "normal");
+          const insight = item.insight
+            ? {
+                prediction: item.prediction,
+                severity: item.severity,
+                ...item.insight,
+              }
+            : createMissingInsight();
           return buildLogEntry(
             {
               ...item,

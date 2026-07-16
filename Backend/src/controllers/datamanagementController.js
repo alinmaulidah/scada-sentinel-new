@@ -20,16 +20,19 @@ const parseTimestamp = (val) => {
 };
 
 const toNum = (v) => {
-  if (v === "" || v === null || v === undefined) return 0;
+  if (v === "" || v === null || v === undefined) return null;
   const cleaned = String(v).replace(",", ".");
-  return isNaN(Number(cleaned)) ? 0 : Number(cleaned);
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
 };
+
+const toBinary = (value) => ([0, 1].includes(Number(value)) ? Number(value) : null);
 
 // ================= GET DATA (SORT BY ROW INDEX) =================
 const getScadaData = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const search = req.query.search || "";
     const offset = (page - 1) * limit;
     const searchQuery = `%${search}%`;
@@ -79,6 +82,10 @@ const getScadaData = async (req, res) => {
 const importScadaData = async (req, res) => {
   try {
     const rawData = req.body.data;
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      return res.status(400).json({ success: false, message: "Data impor harus berupa array yang tidak kosong." });
+    }
+
     const values = rawData.map((item, index) => [
       parseTimestamp(item.timestamp || item.Timestamp),
       toNum(item.segment_id || item.segment_ID),
@@ -90,11 +97,19 @@ const importScadaData = async (req, res) => {
       toNum(item.pump_speed || item.pump_speed),
       toNum(item.compressor_state || item.compressor_state),
       toNum(item.energy_consumption || item.energy_consumption),
-      item.alarm_triggered == 1 ? 1 : 0,
+      toBinary(item.alarm_triggered),
       (item.event_type || "normal").toLowerCase(),
-      item.target == 1 ? 1 : 0,
+      toBinary(item.target),
       index + 1 // Simpan nomor baris asli Excel
     ]);
+
+    const invalidRowIndex = values.findIndex((row) => row.slice(0, 13).some((value) => value === null));
+    if (invalidRowIndex !== -1) {
+      return res.status(400).json({
+        success: false,
+        message: `Baris ${invalidRowIndex + 2} memiliki nilai sensor atau label target yang tidak valid.`,
+      });
+    }
 
     await db.query(
       `INSERT INTO sensor_logs (timestamp, segment_id, pressure, flow_rate, temperature, valve_status, pump_state, pump_speed, compressor_state, energy_consumption, alarm_triggered, event_type, target, row_index) VALUES ?`,

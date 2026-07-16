@@ -1,4 +1,21 @@
 const db = require("../config/db");
+const { mapAlgorithmResult } = require("../utils/algorithmResult");
+const { getMonitoringInsight } = require("../utils/monitoringInsight");
+
+const enrichDetails = (details, isNormalFromAlgorithm) => details.map((item) => {
+  const insight = getMonitoringInsight({ ...item, is_normal_from_algo: isNormalFromAlgorithm });
+
+  return {
+    ...item,
+    prediction: insight.prediction,
+    severity: insight.severity,
+    insight: {
+      reason: insight.reason,
+      impact: insight.impact,
+      solution: insight.solution,
+    },
+  };
+});
 
 // ======================================================
 // GET ALL ALGORITHM RESULTS (FOR MONITORING PAGE)
@@ -9,30 +26,14 @@ exports.getAllAlgorithmResults = async (req, res) => {
       `SELECT * FROM algorithm_results ORDER BY created_at DESC`
     );
 
-    const formatted = rows.map((item) => ({
-      id: item.id,
-      algorithm: item.algorithm,
-      normalization: item.normalization,
-      cluster: item.cluster,
-      eps: item.eps,
-      min_samples: item.min_samples,
-      anomaly: Number(item.anomaly) || 0,
-      normal: Number(item.normal) || 0,
-      silhouette: Number(item.silhouette) || 0,
-      davies_bouldin: Number(item.davies_bouldin) || 0,
-      accuracy: Number(item.accuracy) || 0,
-      precision_score: Number(item.precision_score) || 0,
-      recall_score: Number(item.recall_score) || 0,
-      f1_score: Number(item.f1_score) || 0,
-      status: item.status || "Done",
-      anomaly_details: item.anomaly_details
-        ? JSON.parse(item.anomaly_details)
-        : [],
-      normal_details: item.normal_details
-        ? JSON.parse(item.normal_details)
-        : [],
-      created_at: item.created_at,
-    }));
+    const formatted = rows.map((item) => {
+      const result = mapAlgorithmResult(item, true);
+      return {
+        ...result,
+        anomaly_details: enrichDetails(result.anomaly_details, false),
+        normal_details: enrichDetails(result.normal_details, true),
+      };
+    });
 
     return res.status(200).json({
       success: true,

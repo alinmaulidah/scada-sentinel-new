@@ -22,8 +22,8 @@ import {
   MapPin,
   RefreshCw
 } from "lucide-react";
+import { runAlgorithm } from "../features/algorithm/algorithm.api";
 
-const API = "http://localhost:5000/api";
 const PRIMARY_COLOR = "#336B87";
 
 const AlgorithmExecution = () => {
@@ -51,18 +51,11 @@ const AlgorithmExecution = () => {
   const handleRun = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API}/algoritma/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          algorithm: selectedAlgorithm,
-          normalization: selectedNormalization,
-        }),
+      const { data } = await runAlgorithm({
+        algorithm: selectedAlgorithm,
+        normalization: selectedNormalization,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
         const fallbackSeeds = [
           { label: "Centroid 1 (Baris #42)", pressure: 0.15, flow_rate: 0.72 },
           { label: "Centroid 2 (Baris #118)", pressure: 0.88, flow_rate: 0.14 }
@@ -87,12 +80,9 @@ const AlgorithmExecution = () => {
           random_seed_nodes: data.random_seed_nodes?.length ? data.random_seed_nodes : fallbackSeeds,
           final_centroids: data.final_centroids?.length ? data.final_centroids : fallbackCentroids
         });
-      } else {
-        alert("Backend Error : " + data.message);
-      }
     } catch (error) {
       console.error(error);
-      alert("Backend belum berjalan atau terjadi kesalahan koneksi.");
+      alert(error.response?.data?.message || "Backend belum berjalan atau terjadi kesalahan koneksi.");
     } finally {
       setIsLoading(false);
     }

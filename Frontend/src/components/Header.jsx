@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { clearSession } from "../lib/session";
 
 import {
   Bell,
@@ -114,8 +115,7 @@ const Header = ({ activePage, onLogin }) => {
   const handleLogout = () => {
 
     // HAPUS SEMUA SESSION
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearSession();
 
     // OPTIONAL
     if (onLogin) {

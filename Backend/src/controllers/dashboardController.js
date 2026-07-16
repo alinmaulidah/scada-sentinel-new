@@ -1,16 +1,9 @@
-const mysql = require('mysql2/promise');
-
-const pool = mysql.createPool({
-  host: 'localhost', 
-  user: 'root', 
-  password: '', 
-  database: 'scada-sentinel' // Pastikan nama DB sesuai dengan setup MySQL-mu
-});
+const db = require("../config/db");
 
 exports.getDashboardStats = async (req, res) => {
   try {
     // 1. Ambil total data riil dari tabel sensor_logs
-    const [totalLogs] = await pool.execute('SELECT COUNT(*) as count FROM sensor_logs');
+    const [totalLogs] = await db.execute("SELECT COUNT(*) AS count FROM sensor_logs");
     const total = totalLogs[0].count || 0;
     
     // 2. Kirim total ke frontend dengan properti totalRecords

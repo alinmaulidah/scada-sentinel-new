@@ -6,7 +6,14 @@ import mysql.connector
 
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.metrics import silhouette_score, davies_bouldin_score
+from sklearn.metrics import (
+    accuracy_score,
+    davies_bouldin_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    silhouette_score,
+)
 from sklearn.neighbors import NearestNeighbors
 
 
@@ -15,7 +22,7 @@ from sklearn.neighbors import NearestNeighbors
 # =====================================================================
 def safe_number(value):
     if value is None:
-        return 0.0
+        return np.nan
     try:
         value = (
             str(value)
@@ -34,8 +41,8 @@ def safe_number(value):
         else:
             value = value.replace(",", ".")
         return float(value)
-    except:
-        return 0.0
+    except (TypeError, ValueError):
+        return np.nan
 
 
 # =====================================================================
@@ -51,8 +58,21 @@ def safe_silhouette(data, labels):
             idx = np.random.choice(len(data), 2000, replace=False)
             return float(silhouette_score(data[idx], labels_arr[idx]))
         return float(silhouette_score(data, labels_arr))
-    except:
+    except ValueError:
         return 0.0
+
+
+def calculate_classification_metrics(targets, statuses):
+    """Evaluate unsupervised predictions against the dataset's known labels."""
+    actual = np.asarray(targets, dtype=int)
+    predicted = np.asarray([0 if status == "normal" else 1 for status in statuses])
+
+    return {
+        "accuracy": float(accuracy_score(actual, predicted)),
+        "precision": float(precision_score(actual, predicted, zero_division=0)),
+        "recall": float(recall_score(actual, predicted, zero_division=0)),
+        "f1": float(f1_score(actual, predicted, zero_division=0)),
+    }
 
 
 # =====================================================================
@@ -169,12 +189,8 @@ def run_analysis():
             }))
             return
 
-        # Acak urutan data dengan seed tetap agar reproducible
-        df = (
-            pd.DataFrame(records)
-            .sample(frac=1, random_state=42)
-            .reset_index(drop=True)
-        )
+        # Pertahankan urutan waktu agar hasil dapat ditelusuri ke log SCADA asli.
+        df = pd.DataFrame(records).reset_index(drop=True)
 
         # Log statistik ke stderr (tidak mengontaminasi output JSON)
         print(f"Total Data   : {len(df)}",                 file=sys.stderr)
@@ -192,18 +208,25 @@ def run_analysis():
         for col in features:
             df[col] = df[col].apply(safe_number)
 
-        # 4b. Clipping outlier ekstrem (persentil 1%-99%)
-        for col in features:
-            df[col] = df[col].clip(
-                df[col].quantile(0.01),
-                df[col].quantile(0.99)
-            )
+        # Jangan melakukan clipping: nilai ekstrem yang valid adalah kandidat anomali.
+        valid_rows = df[features].notna().all(axis=1)
+        dropped_rows = int((~valid_rows).sum())
+        df = df.loc[valid_rows].reset_index(drop=True)
 
-        # 4c. Imputasi missing values dengan mean
-        for col in features:
-            df[col] = df[col].fillna(df[col].mean())
+        if df.empty:
+            print(json.dumps({"error": "Tidak ada baris sensor valid untuk dianalisis"}))
+            return
 
-        # 4d. Hitung statistik global untuk klasifikasi anomali
+        df["target"] = pd.to_numeric(df["target"], errors="coerce")
+        if not df["target"].isin([0, 1]).all():
+            print(json.dumps({"error": "Kolom target harus berisi label 0 (normal) atau 1 (anomali)"}))
+            return
+
+        df["target"] = df["target"].astype(int)
+        print(f"Data Dianalisis: {len(df)}", file=sys.stderr)
+        print(f"Baris Tidak Valid Dilewati: {dropped_rows}", file=sys.stderr)
+
+        # 4c. Hitung statistik global untuk klasifikasi anomali
         global_stats = {}
         for col in features:
             std_val = float(df[col].std())
@@ -247,6 +270,7 @@ def run_analysis():
 
         # Inisialisasi variabel output
         silhouette, dbi         = 0.0, 0.0
+        internal_metrics_available = False
         qualitative_statuses    = ["normal"] * len(df)
         labels                  = np.zeros(len(df), dtype=int)
         distances               = np.zeros(len(df))
@@ -330,6 +354,7 @@ def run_analysis():
             if len(set(labels)) > 1:
                 silhouette = safe_silhouette(scaled_data, labels)
                 dbi        = davies_bouldin_score(scaled_data, labels)
+                internal_metrics_available = True
 
             # Tentukan klaster normal (klaster dengan anggota terbanyak)
             unique_labels, counts = np.unique(labels, return_counts=True)
@@ -385,9 +410,7 @@ def run_analysis():
                     dbi = davies_bouldin_score(
                         scaled_data[core_mask], labels[core_mask]
                     )
-                else:
-                    silhouette = safe_silhouette(scaled_data, labels)
-                    dbi        = 0.0
+                    internal_metrics_available = True
 
             distances       = k_distances
             threshold       = eps_value
@@ -456,15 +479,23 @@ def run_analysis():
         # -----------------------------------------------------------------
         # 7. TENTUKAN STATUS EVALUASI
         # -----------------------------------------------------------------
+        evaluation = calculate_classification_metrics(
+            df["target"].to_numpy(),
+            qualitative_statuses,
+        )
         status_eval = (
             "Optimal" if silhouette >= 0.70 else
             "Good"    if silhouette >= 0.50 else
             "Stable"  if silhouette >= 0.25 else
             "Low"
-        )
+        ) if internal_metrics_available else "Insufficient Clusters"
 
         print(f"Silhouette Score    : {silhouette:.4f}",       file=sys.stderr)
         print(f"Davies-Bouldin Index: {dbi:.4f}",               file=sys.stderr)
+        print(f"Accuracy            : {evaluation['accuracy']:.4f}",  file=sys.stderr)
+        print(f"Precision           : {evaluation['precision']:.4f}", file=sys.stderr)
+        print(f"Recall              : {evaluation['recall']:.4f}",    file=sys.stderr)
+        print(f"F1 Score            : {evaluation['f1']:.4f}",        file=sys.stderr)
         print(f"Status Evaluasi     : {status_eval}",           file=sys.stderr)
         print(f"Total Anomali       : {len(anomaly_details)}",  file=sys.stderr)
         print(f"Total Normal        : {len(normal_details)}",   file=sys.stderr)
@@ -482,6 +513,21 @@ def run_analysis():
             "database_anchors": global_stats,
             "silhouette":       round(float(silhouette), 3),
             "davies_bouldin":   round(float(dbi), 3),
+            "accuracy":         round(evaluation["accuracy"], 3),
+            "precision":        round(evaluation["precision"], 3),
+            "recall":           round(evaluation["recall"], 3),
+            "f1":               round(evaluation["f1"], 3),
+            "evaluation": {
+                "ground_truth": "target (0=normal, 1=anomali)",
+                "prediction_rule": "status selain normal diperlakukan sebagai anomali",
+            },
+            "internal_metrics_available": internal_metrics_available,
+            "data_quality": {
+                "records_read": len(records),
+                "records_analyzed": len(df),
+                "invalid_records_skipped": dropped_rows,
+                "outlier_clipping": "not_applied",
+            },
             "status":           status_eval,
             "anomaly_details":  anomaly_details,
             "normal_details":   normal_details

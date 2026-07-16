@@ -40,18 +40,15 @@ export default function ThresholdGauge({
   const warnPct = ((warnMax - min) / (max - min)) * 100;
 
   // Tentukan zona & warna
-  let zone = "safe";
   let zoneColor = "bg-emerald-500";
   let zoneLabel = "Aman";
   let textColor = "text-emerald-700";
 
   if (value > warnMax) {
-    zone = "critical";
     zoneColor = "bg-red-500";
     zoneLabel = "Kritis!";
     textColor = "text-red-700";
   } else if (value > safeMax) {
-    zone = "warning";
     zoneColor = "bg-amber-500";
     zoneLabel = "Waspada";
     textColor = "text-amber-700";

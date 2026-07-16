@@ -1,15 +1,15 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { clearSession, getSessionUser } from "../lib/session";
 import {
   LayoutDashboard, Database, Activity, BarChart3,
   Settings, LogOut, ChevronLeft, ShieldCheck
 } from "lucide-react";
 
-const Sidebar = ({ isOpen, toggleSidebar, activePage, setActivePage, onLogin }) => {
+const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
   const navigate = useNavigate();
 
-  const storedUser = localStorage.getItem('user');
-  const user = storedUser ? JSON.parse(storedUser) : null;
+  const user = getSessionUser();
 
   // ID Menu di sini harus 100% SAMA dengan properti 'path' di App.jsx
   const allMenuItems = [
@@ -43,8 +43,7 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, setActivePage, onLogin }) 
   });
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearSession();
     onLogin(false);
     navigate("/login");
   };
@@ -88,8 +87,7 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, setActivePage, onLogin }) 
             <button
               key={item.id}
               onClick={() => {
-                setActivePage(item.id);     // Mengubah status menu aktif di UI
-                navigate(`/${item.id}`);    // Memicu perpindahan halaman React Router secara aman
+                navigate(`/${item.id}`);
               }}
               className={`
                 flex items-center gap-3.5 w-full px-3.5 py-3 rounded-xl 

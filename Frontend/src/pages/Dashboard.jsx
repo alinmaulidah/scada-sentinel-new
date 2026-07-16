@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -25,10 +25,9 @@ import {
   ShieldAlert,
   Info
 } from "lucide-react";
-import axios from "axios";
+import { getAlgorithmResults, getScadaRecordCount, resetDashboardResults } from "../features/dashboard/dashboard.api";
 
 const PRIMARY_COLOR = "#336B87";
-const API = "http://localhost:5000/api";
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
@@ -41,10 +40,10 @@ export default function Dashboard() {
   const [showGuide, setShowGuide] = useState(true);
 
   /* ================= FETCH DATA & STATS ================= */
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const resAlgo = await axios.get(`${API}/algoritma/results`);
+      const resAlgo = await getAlgorithmResults();
       const jsonAlgo = resAlgo.data || [];
 
       // KODE BARU — tambahkan davies_bouldin
@@ -58,7 +57,7 @@ const formatted = jsonAlgo.map((d, i) => ({
 }));
       setData(formatted);
 
-      const resScada = await axios.get(`${API}/scada-data?page=1&limit=1`);
+      const resScada = await getScadaRecordCount();
       if (resScada.data) {
         setTotalLogs(resScada.data.totalRecords || 0);
       }
@@ -69,10 +68,12 @@ const formatted = jsonAlgo.map((d, i) => ({
     } finally {
       setLoading(false);
     }
-  };
+  // This callback runs after the component has initialized generateAIInsight.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ================= DYNAMIC AI ANALYSIS SYSTEM ================= */
-  const generateAIInsight = (arr) => {
+  const generateAIInsight = useCallback((arr) => {
     if (!arr.length) {
       setAiInsight("Belum ada data pengujian algoritma di dalam matriks database.");
       return;
@@ -106,13 +107,13 @@ const formatted = jsonAlgo.map((d, i) => ({
     }
 
     setAiInsight(textInsight);
-  };
+  }, []);
 
   const handleReset = async () => {
     if (!window.confirm("Apakah Anda yakin ingin mereset seluruh riwayat matriks perbandingan algoritma?")) return;
     try {
       setLoading(true);
-      await axios.delete(`${API}/algoritma/reset`);
+      await resetDashboardResults();
       setData([]);
       setAiInsight("");
     } catch (err) {
@@ -124,7 +125,7 @@ const formatted = jsonAlgo.map((d, i) => ({
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const sorted = [...data].sort((a, b) => b.score - a.score);
   const best = sorted[0];

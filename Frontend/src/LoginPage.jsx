@@ -12,7 +12,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import axios from "axios";
+import api from "./lib/api";
+import { saveSession } from "./lib/session";
 
 function Login({ onLogin }) {
 
@@ -45,20 +46,13 @@ function Login({ onLogin }) {
         "remembered_username"
       );
 
-    const savedPass =
-      localStorage.getItem(
-        "remembered_password"
-      );
-
-    if (savedUser && savedPass) {
+    if (savedUser) {
 
       setUsername(savedUser);
-
-      setPassword(savedPass);
-
       setRememberMe(true);
-
     }
+
+    localStorage.removeItem("remembered_password");
 
   }, []);
 
@@ -76,25 +70,11 @@ function Login({ onLogin }) {
 
     try {
 
-      const response = await axios.post(
-        "http://localhost:5000/api/login",
-        {
-          username,
-          password,
-        }
-      );
+      const response = await api.post("/login", { username, password });
 
       /* SAVE SESSION */
 
-      localStorage.setItem(
-        "token",
-        response.data.token
-      );
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify(response.data.user)
-      );
+      saveSession(response.data);
 
       /* REMEMBER ME */
 
@@ -105,19 +85,10 @@ function Login({ onLogin }) {
           username
         );
 
-        localStorage.setItem(
-          "remembered_password",
-          password
-        );
-
       } else {
 
         localStorage.removeItem(
           "remembered_username"
-        );
-
-        localStorage.removeItem(
-          "remembered_password"
         );
 
       }
@@ -168,27 +139,24 @@ function Login({ onLogin }) {
 
           <div className="flex flex-col items-center mb-10">
 
-            <div className="w-20 h-20 rounded-[2rem] bg-[#336B87] flex items-center justify-center text-white shadow-xl shadow-blue-900/20 mb-5">
-
-              <BrainCircuit size={36} />
-
-            </div>
+            
 
             
 
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight mt-2">
-              Pipe Analytica
-            </h1>
+            <img
+              src="/logo-pipeline.png"
+              alt="Pipeline Analytica"
+              className="w-24 h-24 object-contain"
+            />
 
             
-
           </div>
 
           {/* ERROR */}
 
           {errorMessage && (
 
-            <div className="mb-5 flex items-start gap-3 bg-red-50 border border-red-100 text-red-500 px-4 py-3 rounded-2xl">
+            <div className="mb-5 flex items-start gap-2 g-red-50 border border-red-100 text-red-500 px-4 py-3 rounded-2xl">
 
               <AlertTriangle size={18} />
 
@@ -234,7 +202,7 @@ function Login({ onLogin }) {
 
                 <input
                   type="text"
-                  placeholder="Enter username"
+                  placeholder=" username"
                   className="w-full bg-transparent py-4 outline-none text-sm font-semibold text-slate-700 placeholder:text-slate-400"
                   value={username}
                   onChange={(e) =>
@@ -270,7 +238,7 @@ function Login({ onLogin }) {
                       ? "text"
                       : "password"
                   }
-                  placeholder="Enter password"
+                  placeholder=" password"
                   className="w-full bg-transparent py-4 outline-none text-sm font-semibold text-slate-700 placeholder:text-slate-400"
                   value={password}
                   onChange={(e) =>

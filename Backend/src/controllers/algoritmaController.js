@@ -1,6 +1,7 @@
 const { execFile } = require("child_process");
 const path = require("path");
-const db = require("../config/db"); // Import koneksi MySQL pool/promise kamu
+const db = require("../config/db");
+const { pythonCommand } = require("../config/env");
 
 // ======================================================
 // PROMISE WRAPPER EXECFILE (Aman dari Alokasi Buffer Macet)
@@ -8,7 +9,7 @@ const db = require("../config/db"); // Import koneksi MySQL pool/promise kamu
 const runPythonFile = (scriptPath, args) => {
   return new Promise((resolve, reject) => {
     execFile(
-      "python", 
+      pythonCommand,
       [scriptPath, args],
       { 
         timeout: 0,                 // Node.js dilarang mematikan runtime Python secara paksa

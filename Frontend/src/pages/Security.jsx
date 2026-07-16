@@ -11,14 +11,9 @@ import {
   CheckCircle,
   AlertCircle
 } from "lucide-react";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "../lib/api";
 
 const Security = () => {
-  const sessionUser = JSON.parse(localStorage.getItem("user")) || {};
-  const userId = sessionUser.id || 2;
-
   // State kumpul data input password
   const [passwords, setPasswords] = useState({
     currentPassword: "",
@@ -59,7 +54,7 @@ const Security = () => {
       setIsSubmitting(true);
       
       // Ambil username lama agar backend tidak menimpa field info umum menjadi kosong/null
-      const responseUser = await axios.get(`${API}/profile/${userId}`);
+      const responseUser = await api.get("/profile");
       const baseProfile = responseUser.data?.data || {};
 
       const payload = {
@@ -72,7 +67,7 @@ const Security = () => {
         confirmPassword: passwords.confirmPassword
       };
 
-      const response = await axios.put(`${API}/profile/${userId}`, payload);
+      const response = await api.put("/profile", payload);
 
       if (response.data?.success) {
         setMessage({ text: "Kata sandi akun SCADA berhasil diubah!", type: "success" });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Routes,
   Route,
@@ -22,44 +22,13 @@ import MyProfile from "./pages/MyProfile";
 function App() {
 
   const [isAuthenticated, setIsAuthenticated] =
-    useState(false);
+    useState(() => Boolean(localStorage.getItem("token")));
 
   const [isSidebarOpen, setIsSidebarOpen] =
     useState(false);
 
-  const [activePage, setActivePage] =
-    useState("overview");
-
   const location = useLocation();
-
-  /* =========================
-     CHECK LOGIN SESSION
-  ========================= */
-
-  useEffect(() => {
-
-    const token = localStorage.getItem("token");
-
-    if (token) {
-      setIsAuthenticated(true);
-    }
-
-  }, []);
-
-  /* =========================
-     ACTIVE PAGE SYNC
-  ========================= */
-
-  useEffect(() => {
-  const path = location.pathname.replace("/", "");
-  
-  // Jika path kosong (halaman utama), set activePage ke "overview"
-  if (!path) {
-    setActivePage("overview");
-  } else if (path !== "login") {
-    setActivePage(path);
-  }
-}, [location]);
+  const activePage = location.pathname.slice(1) || "overview";
 
   /* =========================
      PROTECTED ROUTE
@@ -104,7 +73,6 @@ function App() {
           setIsSidebarOpen(!isSidebarOpen)
         }
         activePage={activePage}
-        setActivePage={setActivePage}
         onLogin={setIsAuthenticated}
       />
 

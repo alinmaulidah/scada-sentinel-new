@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { mapAlgorithmResult } = require("../utils/algorithmResult");
 
 // ======================================================
 // GET ALL RESULTS (FOR DASHBOARD)
@@ -9,32 +10,7 @@ exports.getAllResults = async (req, res) => {
       `SELECT * FROM algorithm_results ORDER BY created_at DESC`
     );
 
-    const formatted = rows.map((item) => ({
-      id: item.id,
-      algorithm: item.algorithm,
-      normalization: item.normalization,
-
-      anomaly: Number(item.anomaly) || 0,
-      normal: Number(item.normal) || 0,
-
-      silhouette: Number(item.silhouette) || 0,
-      davies_bouldin: Number(item.davies_bouldin) || 0,
-
-      accuracy: Number(item.accuracy) || 0,
-      precision_score: Number(item.precision_score) || 0,
-      recall_score: Number(item.recall_score) || 0,
-      f1_score: Number(item.f1_score) || 0,
-
-      status: item.status || "Done",
-
-      anomaly_details: item.anomaly_details
-        ? JSON.parse(item.anomaly_details)
-        : [],
-
-      normal_details: item.normal_details
-        ? JSON.parse(item.normal_details)
-        : [],
-    }));
+    const formatted = rows.map((item) => mapAlgorithmResult(item));
 
     return res.json(formatted);
   } catch (err) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import {
   AlertTriangle,
   ShieldAlert,
@@ -54,8 +54,6 @@ const SEVERITY_CONFIG = {
 export default function AlertBanner({ logs = [] }) {
   const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
   const [dismissed, setDismissed] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const prevLogLenRef = useRef(0);
 
   // Hitung log kritis yang BELUM di-acknowledge
   const criticalLogs = logs.filter(
@@ -70,14 +68,6 @@ export default function AlertBanner({ logs = [] }) {
       !acknowledgedIds.has(l.id)
   );
 
-  // Auto-show: trigger ketika ada critical log baru masuk
-  useEffect(() => {
-    if (logs.length > prevLogLenRef.current && criticalLogs.length > 0 && !dismissed) {
-      setVisible(true);
-    }
-    prevLogLenRef.current = logs.length;
-  }, [logs.length, criticalLogs.length, dismissed]);
-
   const handleAcknowledge = useCallback(() => {
     const allCriticalIds = new Set([
       ...acknowledgedIds,
@@ -85,16 +75,14 @@ export default function AlertBanner({ logs = [] }) {
       ...mediumLogs.map((l) => l.id),
     ]);
     setAcknowledgedIds(allCriticalIds);
-    setVisible(false);
   }, [acknowledgedIds, criticalLogs, mediumLogs]);
 
   const handleDismiss = useCallback(() => {
     setDismissed(true);
-    setVisible(false);
   }, []);
 
   // Kondisi tidak ada alert
-  if (!visible || (criticalLogs.length === 0 && mediumLogs.length === 0)) {
+  if (dismissed || (criticalLogs.length === 0 && mediumLogs.length === 0)) {
     // Tampilkan banner hijau "System Normal" jika tidak ada insiden
     if (dismissed && criticalLogs.length === 0) {
       return (

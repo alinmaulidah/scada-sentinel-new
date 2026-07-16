@@ -12,16 +12,14 @@ import {
   CheckCircle,
   AlertCircle
 } from "lucide-react";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "../lib/api";
+import { getSessionUser, setSessionUser } from "../lib/session";
 
 export default function MyProfile() {
   // Ambil data dasar login dari localStorage
-  const sessionUser = JSON.parse(localStorage.getItem("user")) || {};
+  const sessionUser = getSessionUser() || {};
   
   // 🚨 TIPS: Jika di DB kamu ID admin-nya adalah 1, ganti angka 2 di bawah ini menjadi 1
-  const userId = sessionUser.id || 2; 
 
   // State Data Profil Utama
   const [profileData, setProfileData] = useState({
@@ -53,8 +51,7 @@ export default function MyProfile() {
       setIsLoading(true);
       setMessage({ text: "", type: "" });
       
-      console.log("Request ke backend untuk User ID:", userId);
-      const response = await axios.get(`${API}/profile/${userId}`);
+      const response = await api.get("/profile");
       
       if (response.data?.success) {
         const dbData = response.data.data;
@@ -80,7 +77,7 @@ export default function MyProfile() {
 
   useEffect(() => {
     fetchUserProfile();
-  }, [userId]);
+  }, []);
 
   // Handle Input Form Change
   const handleInputChange = (e) => {
@@ -95,14 +92,14 @@ export default function MyProfile() {
 
     try {
       setIsSubmitting(true);
-      const response = await axios.put(`${API}/profile/${userId}`, formData);
+      const response = await api.put("/profile", formData);
       
       if (response.data?.success) {
         setMessage({ text: response.data.message || "Profil berhasil diperbarui!", type: "success" });
         
         // Update Local Storage jika username berubah agar sinkron dengan sidebar/navbar
         const updatedSession = { ...sessionUser, username: formData.username };
-        localStorage.setItem("user", JSON.stringify(updatedSession));
+        setSessionUser(updatedSession);
 
         // Ambil ulang data profil segar dari database
         await fetchUserProfile();

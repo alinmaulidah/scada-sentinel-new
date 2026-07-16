@@ -1,7 +1,11 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
 
 require("dotenv").config();
+const { corsOrigin, port } = require("./config/env");
+const { requireAuth } = require("./middleware/authMiddleware");
 
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -13,10 +17,9 @@ const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 
-
-// ================= MIDDLEWARE =================
-
-app.use(cors());
+app.use(helmet());
+app.use(cors({ origin: corsOrigin }));
+app.use(morgan("dev"));
 
 app.use(express.json({
   limit: "50mb",
@@ -28,33 +31,19 @@ app.use(express.urlencoded({
 }));
 
 
-// ================= ROUTES =================
-
-// AUTH
 app.use("/api", authRoutes);
-
-// DASHBOARD
+app.use("/api", requireAuth);
 app.use("/api", dashboardRoutes);
-
-// DATA MANAGEMENT
 app.use("/api", dataRoutes);
-
-// ALGORITHM EXECUTION
 app.use("/api/algoritma", algoritmaRoutes);
-
-// MONITORING
 app.use("/api/monitoring", monitoringRoutes);
-
-// ALGORITHM RESULTS (CRUD for Monitoring Page)
 app.use("/api/algorithm_results", algorithmResultsRoutes);
-
-// PROFILE
 app.use("/api", profileRoutes);
 
-// ================= SERVER =================
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: "Endpoint tidak ditemukan." });
+});
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`SERVER RUNNING ON PORT ${PORT}`);
+app.listen(port, () => {
+  console.log(`SERVER RUNNING ON PORT ${port}`);
 });

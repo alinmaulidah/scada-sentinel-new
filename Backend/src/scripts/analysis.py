@@ -1,5 +1,6 @@
 import sys
 import json
+import os
 import pandas as pd
 import numpy as np
 import mysql.connector
@@ -156,10 +157,11 @@ def run_analysis():
         # 2. KONEKSI DATABASE
         # -----------------------------------------------------------------
         db = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="",
-            database="scada-sentinel",
+            host=os.environ["DB_HOST"],
+            port=int(os.getenv("DB_PORT", "3306")),
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            database=os.environ["DB_NAME"],
             connect_timeout=10
         )
         cursor = db.cursor(dictionary=True)

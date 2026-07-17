@@ -160,7 +160,7 @@ def run_analysis():
             host=os.environ["DB_HOST"],
             port=int(os.getenv("DB_PORT", "3306")),
             user=os.environ["DB_USER"],
-            password=os.environ["DB_PASSWORD"],
+            password=os.getenv("DB_PASSWORD", ""),
             database=os.environ["DB_NAME"],
             connect_timeout=10
         )

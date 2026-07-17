@@ -88,7 +88,7 @@ const AlgorithmExecution = () => {
     }
   };
 
-  const currentAlgo = executionResult.algorithm ? executionResult.algorithm.toLowerCase() : "";
+  const currentAlgo = executionResult.algorithm?.toLowerCase().replace(/[^a-z]/g, "") || "";
 
   return (
     <div className="space-y-6 pt-2 max-w-[1600px] mx-auto px-4 sm:px-6 text-slate-800">

@@ -4,6 +4,40 @@ import * as XLSX from "xlsx";
 import { Upload, Database, Search, ChevronLeft, ChevronRight, Trash2, AlertTriangle, CheckCircle } from "lucide-react";
 
 const PRIMARY_COLOR = "#336B87"; 
+const SENSOR_COLUMNS = new Set([
+  "pressure",
+  "flow_rate",
+  "temperature",
+  "pump_speed",
+  "energy_consumption",
+]);
+
+const findDateFormattedSensorCells = (sheet) => {
+  const range = sheet["!ref"] && XLSX.utils.decode_range(sheet["!ref"]);
+  if (!range) return [];
+
+  const headers = {};
+  for (let column = range.s.c; column <= range.e.c; column += 1) {
+    const address = XLSX.utils.encode_cell({ r: range.s.r, c: column });
+    headers[column] = String(sheet[address]?.v || "").trim().toLowerCase();
+  }
+
+  const findings = [];
+  for (let row = range.s.r + 1; row <= range.e.r; row += 1) {
+    for (let column = range.s.c; column <= range.e.c; column += 1) {
+      const field = headers[column];
+      const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
+      if (
+        SENSOR_COLUMNS.has(field) &&
+        cell?.t === "n" &&
+        /[dmy]/i.test(cell.z || "")
+      ) {
+        findings.push({ row: row + 1, field });
+      }
+    }
+  }
+  return findings;
+};
 
 const DataManagement = () => {
   const [data, setData] = useState([]);
@@ -41,14 +75,26 @@ const DataManagement = () => {
       try {
         setLoading(true);
         const wb = XLSX.read(evt.target.result, { type: "array" });
-        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const dateFormattedSensors = findDateFormattedSensorCells(sheet);
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: false });
+
+        if (dateFormattedSensors.length > 0) {
+          const fields = [...new Set(dateFormattedSensors.map((item) => item.field))].join(", ");
+          const proceed = window.confirm(
+            `Terdeteksi ${dateFormattedSensors.length} sel sensor berformat tanggal Excel pada kolom ${fields}. ` +
+            "Sistem akan mengimpor nilai yang tampil di Excel (bukan serial tanggal internal). " +
+            "Pastikan nilai tampil sudah sesuai dengan dataset sumber sebelum melanjutkan."
+          );
+          if (!proceed) return;
+        }
         await api.post("/import-scada", { data: json });
-        alert("Data master SCADA berhasil diimport ke database!");
+        alert(`Data master SCADA berhasil diimport ke database${dateFormattedSensors.length ? ` setelah pemulihan ${dateFormattedSensors.length} nilai tampilan Excel` : ""}!`);
         setPage(1);
         fetchData();
       } catch (err) {
         console.error("Gagal mengimpor data:", err);
-        alert("Terjadi kesalahan saat mengimpor data. Periksa format kolom Excel Anda.");
+        alert(err.response?.data?.message || "Terjadi kesalahan saat mengimpor data. Periksa format kolom Excel Anda.");
       } finally {
         setLoading(false);
         e.target.value = ""; // Reset input file
@@ -58,18 +104,18 @@ const DataManagement = () => {
   };
 
   const handleWipeDatabase = async () => {
-    if (!window.confirm("PERINGATAN AKADEMIS: Apakah Anda yakin ingin menghapus SELURUH log data sensor di database? Tindakan ini tidak dapat dibatalkan.")) return;
+    if (!window.confirm("PERINGATAN AKADEMIS: Menghapus dataset aktif juga akan menghapus seluruh riwayat hasil analisis agar hasil lama tidak tercampur dengan dataset baru. Lanjutkan?")) return;
     try {
       setLoading(true);
-      await api.delete("/clear-sensor-logs");
+      const response = await api.delete("/clear-sensor-logs");
       setPage(1);
       setData([]);
       setTotalRecords(0);
       setTotalPages(1);
-      alert("Database berhasil dikosongkan.");
+      alert(response.data?.message || "Dataset aktif dan riwayat hasil berhasil dikosongkan.");
     } catch (err) {
       console.error("Gagal mengosongkan database:", err);
-      alert("Gagal membersihkan database.");
+      alert(err.response?.data?.message || "Gagal membersihkan database.");
     } finally {
       setLoading(false);
     }
@@ -101,7 +147,7 @@ const DataManagement = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 bg-gray-50 min-h-screen font-sans text-slate-600">
+    <div className="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen font-sans text-slate-600">
       <div className="max-w-[1600px] mx-auto space-y-4">
         
         {/* HEADER AREA */}
@@ -177,7 +223,7 @@ const DataManagement = () => {
                     <td colSpan="14" className="p-16 text-center text-xs font-semibold text-slate-400">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                        <span>Menyelaraskan data real-time dengan database...</span>
+                        <span>Memuat data dataset dari database...</span>
                       </div>
                     </td>
                   </tr>
@@ -193,8 +239,8 @@ const DataManagement = () => {
                         <td className="p-3 text-right text-slate-700 font-mono">{formatNum(d.flow_rate, 2)} m³/h</td>
                         <td className="p-3 text-right text-slate-500 font-mono">{formatNum(d.temperature, 1)}°C</td>
                         <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wide border ${d.valve_status == 1 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-100 text-gray-400 border-transparent'}`}>
-                            {d.valve_status == 1 ? 'OPEN' : 'CLOSE'}
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wide border ${d.valve_status == 1 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : d.valve_status == 0 ? 'bg-gray-100 text-gray-400 border-transparent' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                            {d.valve_status == 1 ? 'OPEN' : d.valve_status == 0 ? 'CLOSE' : `STATE ${d.valve_status}`}
                           </span>
                         </td>
                         <td className="p-3 text-center">

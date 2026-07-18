@@ -1,66 +1,45 @@
-const getMonitoringInsight = (item) => {
-  const pressure = Number(item.pressure || 0);
-  const flow = Number(item.flow_rate || 0);
-  const temperature = Number(item.temperature || 0);
-  const speed = Number(item.pump_speed || 0);
-  const type = String(item.type || "").toLowerCase();
+const PATTERN_INSIGHTS = {
+  surge: {
+    reason: "Pressure dan flow rate berada di atas median + 1,5 IQR pada eksekusi ini.",
+    impact: "Kenaikan serentak ini adalah pola snapshot yang konsisten dengan surge-like; osilasi tekanan tetap perlu deret waktu kontinu untuk dibuktikan.",
+  },
+  leak: {
+    reason: "Pressure berada di bawah median - 1 IQR dan flow rate di bawah median - 0,5 IQR pada eksekusi ini.",
+    impact: "Pola ini adalah aturan klasifikasi penelitian yang dapat konsisten dengan leak-like, bukan bukti kebocoran fisik secara pasti.",
+  },
+  blockage: {
+    reason: "Pressure berada di atas median + 1 IQR sedangkan flow rate di bawah median - 0,5 IQR pada eksekusi ini.",
+    impact: "Kombinasi pressure tinggi dan flow rendah dapat konsisten dengan blockage-like, tetapi perlu data valve atau tekanan hulu-hilir untuk konfirmasi.",
+  },
+  degradation: {
+    reason: "Observasi anomali ini tidak memenuhi tiga aturan pola pressure-flow lain sehingga ditempatkan pada kategori fallback degradation.",
+    impact: "Kategori fallback bukan bukti degradasi bertahap; kesimpulan degradasi memerlukan tren waktu dan variabel kondisi tambahan.",
+  },
+};
 
-  if (item.is_normal_from_algo || type === "normal") {
+const getMonitoringInsight = (item) => {
+  const algorithmLabel = String(item.type || "anomaly").toLowerCase();
+
+  if (item.is_normal_from_algo || algorithmLabel === "normal") {
     return {
       prediction: "Normal",
       severity: "Safe",
-      reason: "Seluruh parameter sensor berada pada rentang operasional aman.",
-      impact: "Sistem distribusi pipa berjalan stabil tanpa indikasi fluktuasi anomali.",
-      solution: "Lanjutkan monitoring berkala dan preventive maintenance sesuai jadwal.",
+      pattern: "normal",
+      reason: "Observasi ini tidak ditandai sebagai anomali oleh hasil eksekusi algoritma.",
+      impact: "Status ini hanya berlaku pada dataset dan konfigurasi model yang dipilih; bukan pernyataan kondisi operasi nyata.",
+      solution: "Gunakan sebagai pembanding hasil model dan dokumentasikan konfigurasi eksekusinya.",
     };
   }
 
-  if (type === "leak" || (pressure < 2.5 && flow > 8)) {
-    return {
-      prediction: "Leak",
-      severity: "High",
-      reason: `Tekanan drop kritis (${pressure.toFixed(2)} Bar) dengan perubahan aliran (${flow.toFixed(1)} m³/h).`,
-      impact: "Risiko kehilangan komoditas, pencemaran, dan gangguan pasokan hilir.",
-      solution: "Isolasi block valve terdekat, turunkan RPM pompa, dan lakukan inspeksi lapangan.",
-    };
-  }
-
-  if (type === "surge" || (pressure > 5.5 && speed > 1600)) {
-    return {
-      prediction: "Surge",
-      severity: "High",
-      reason: `Lonjakan tekanan (${pressure.toFixed(2)} Bar) dengan kecepatan pompa tinggi (${speed} RPM).`,
-      impact: "Risiko tekanan melampaui MAOP dan kerusakan mekanis pipa.",
-      solution: "Turunkan RPM, aktifkan bypass bila diperlukan, dan periksa surge relief system.",
-    };
-  }
-
-  if (type === "blockage" || (pressure > 4.5 && flow < 3)) {
-    return {
-      prediction: "Blockage",
-      severity: "High",
-      reason: `Tekanan hulu tinggi (${pressure.toFixed(2)} Bar) dengan aliran rendah (${flow.toFixed(1)} m³/h).`,
-      impact: "Risiko hambatan mekanis di pipa dan beban berlebih pada pompa.",
-      solution: "Periksa valve, jadwalkan pembersihan pipa, dan validasi kondisi mekanis.",
-    };
-  }
-
-  if (type === "degradation" || temperature > 65 || (speed > 1500 && flow < 6)) {
-    return {
-      prediction: "Degradation",
-      severity: "Medium",
-      reason: `Suhu (${temperature.toFixed(1)} °C) atau beban pompa (${speed} RPM) menunjukkan penurunan efisiensi.`,
-      impact: "Risiko penurunan performa mekanis dan keausan komponen.",
-      solution: "Periksa bearing, heat exchanger, dan kalibrasi instrumen.",
-    };
-  }
+  const pattern = PATTERN_INSIGHTS[algorithmLabel] || PATTERN_INSIGHTS.degradation;
 
   return {
     prediction: "Anomaly",
     severity: "Medium",
-    reason: "Parameter berada di luar pola klaster normal.",
-    impact: "Berpotensi menandakan ketidakstabilan operasi atau gangguan sensor.",
-    solution: "Validasi silang data dan lakukan monitoring lanjutan.",
+    pattern: algorithmLabel in PATTERN_INSIGHTS ? algorithmLabel : "degradation",
+    reason: pattern.reason,
+    impact: pattern.impact,
+    solution: "Tinjau observasi berdekatan, status valve, dan label event_type dataset sebelum menyimpulkan kondisi fisik.",
   };
 };
 

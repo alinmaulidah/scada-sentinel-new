@@ -1,0 +1,15 @@
+{
+  "source": "dataset-pipeline.xlsx",
+  "output": "scada_stratified_500_seed42.xlsx",
+  "seed": 42,
+  "method": "random stratified sampling by event_type",
+  "source_rows": 1000,
+  "sample_rows": 500,
+  "strata": {
+    "blockage": 23,
+    "degradation": 68,
+    "leak": 32,
+    "normal": 347,
+    "surge": 30
+  }
+}

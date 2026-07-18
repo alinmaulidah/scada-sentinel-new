@@ -25,9 +25,11 @@ test("mapAlgorithmResult normalizes persisted algorithm results", () => {
   assert.deepEqual(result.normal_details, []);
 });
 
-test("monitoring insight uses one backend rule set", () => {
+test("monitoring insight labels a rule-based pattern without claiming a physical diagnosis", () => {
   const insight = getMonitoringInsight({ type: "leak", pressure: 2, flow_rate: 9 });
 
-  assert.equal(insight.prediction, "Leak");
-  assert.equal(insight.severity, "High");
+  assert.equal(insight.prediction, "Anomaly");
+  assert.equal(insight.severity, "Medium");
+  assert.equal(insight.pattern, "leak");
+  assert.match(insight.impact, /bukan bukti kebocoran fisik/i);
 });

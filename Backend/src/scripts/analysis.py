@@ -76,6 +76,16 @@ def calculate_classification_metrics(targets, statuses):
     }
 
 
+def robust_distance_threshold(distances):
+    """Return a label-free K-Means outlier threshold based on median and MAD."""
+    values = np.asarray(distances, dtype=float)
+    median = float(np.median(values))
+    mad = float(np.median(np.abs(values - median)))
+    if mad > 0:
+        return median + 3.0 * 1.4826 * mad, "median + 3*MAD"
+    return float(np.quantile(values, 0.95)), "95th percentile (MAD=0)"
+
+
 # =====================================================================
 # HELPER: ESTIMASI EPSILON DBSCAN OTOMATIS (ELBOW METHOD)
 # =====================================================================
@@ -150,8 +160,14 @@ def run_analysis():
             except:
                 pass
 
-        algo = input_params.get("algorithm",    "kmeans").lower()
+        algo = input_params.get("algorithm", "kmeans").lower()
         norm = input_params.get("normalization", "minmax").lower()
+        if algo not in {"kmeans", "dbscan"}:
+            print(json.dumps({"error": "Algoritma harus kmeans atau dbscan"}))
+            return
+        if norm not in {"minmax", "zscore"}:
+            print(json.dumps({"error": "Normalisasi harus minmax atau zscore"}))
+            return
 
         # -----------------------------------------------------------------
         # 2. KONEKSI DATABASE
@@ -282,8 +298,8 @@ def run_analysis():
         out_eps                 = None
         out_min_samples         = None
         out_iterations          = None
-        out_random_seed_nodes   = None
         out_final_centroids     = None
+        detection_rule          = ""
 
         # =================================================================
         # ALGORITMA 1: K-MEANS
@@ -321,27 +337,7 @@ def run_analysis():
             labels = np.asarray(best_labels)
 
             out_iterations        = int(model.n_iter_)
-            out_random_seed_nodes = []
             out_final_centroids   = []
-
-            # Catat seed nodes awal
-            np.random.seed(42)
-            random_indices = np.random.choice(len(df), size=best_k, replace=False)
-            for k_idx, r_idx in enumerate(random_indices):
-                seg_id       = df.at[r_idx, "segment_id"]
-                final_seg_id = (
-                    int(seg_id)
-                    if isinstance(seg_id, (int, np.integer))
-                    or (isinstance(seg_id, str) and seg_id.isdigit())
-                    else str(seg_id)
-                )
-                out_random_seed_nodes.append({
-                    "label":      f"Pusat Awal Kluster {k_idx + 1}",
-                    "row_index":  int(r_idx + 1),
-                    "segment_id": final_seg_id,
-                    "pressure":   round(float(df.at[r_idx, "pressure"]),  2),
-                    "flow_rate":  round(float(df.at[r_idx, "flow_rate"]), 2)
-                })
 
             # Catat posisi centroid akhir (dalam skala asli)
             actual_centroids = scaler.inverse_transform(model.cluster_centers_)
@@ -349,7 +345,9 @@ def run_analysis():
                 out_final_centroids.append({
                     "label":     f"Kluster {k_idx + 1}",
                     "pressure":  round(float(center[0]), 2),
-                    "flow_rate": round(float(center[1]), 2)
+                    "flow_rate": round(float(center[1]), 2),
+                    "temperature": round(float(center[2]), 2),
+                    "pump_speed": round(float(center[3]), 2)
                 })
 
             # Hitung metrik evaluasi
@@ -358,25 +356,15 @@ def run_analysis():
                 dbi        = davies_bouldin_score(scaled_data, labels)
                 internal_metrics_available = True
 
-            # Tentukan klaster normal (klaster dengan anggota terbanyak)
-            unique_labels, counts = np.unique(labels, return_counts=True)
-            cluster_counts  = dict(zip(unique_labels, counts))
-            sorted_clusters = sorted(
-                cluster_counts, key=cluster_counts.get, reverse=True
-            )
-            major_cluster   = sorted_clusters[0]
-
-            for idx, label in enumerate(labels):
-                if label == major_cluster:
-                    qualitative_statuses[idx] = "normal"
-                elif label == sorted_clusters[-1] and len(sorted_clusters) > 1:
-                    qualitative_statuses[idx] = "anomali"
-                else:
-                    qualitative_statuses[idx] = "warning"
-
-            # Jarak setiap titik ke centroid terdekat
+            # Anomali ditentukan dari jarak ke centroid terdekat, bukan ukuran klaster.
+            # Threshold berbasis median dan MAD tidak menggunakan label target.
             distances = np.min(model.transform(scaled_data), axis=1)
-            threshold = float(np.mean(distances)) if len(distances) > 0 else 1.0
+            threshold, threshold_method = robust_distance_threshold(distances)
+            qualitative_statuses = [
+                "anomali" if distance > threshold else "normal"
+                for distance in distances
+            ]
+            detection_rule = f"K-Means distance > {threshold_method} ({threshold:.6f})"
             out_cluster = str(len(set(labels)))
 
         # =================================================================
@@ -416,6 +404,7 @@ def run_analysis():
 
             distances       = k_distances
             threshold       = eps_value
+            detection_rule  = f"DBSCAN noise point (eps={eps_value:.6f}, min_samples={min_samples})"
             unique_clusters = set(labels) - {-1}
             out_cluster     = str(len(unique_clusters)) if unique_clusters else "0"
             out_eps         = float(round(eps_value, 4))
@@ -448,10 +437,11 @@ def run_analysis():
                 type_final     = "normal"
                 severity_final = "normal"
 
-            # Hitung confidence score
+            # Skor menunjukkan seberapa jauh titik dari batas normal menurut model.
             denom      = threshold if threshold > 0 else 1.0
-            raw_conf   = (1.0 - min(distances[i] / denom, 1.0)) * 100
-            confidence = max(0.0, round(float(raw_conf), 2))
+            ratio      = float(distances[i] / denom)
+            raw_conf   = ratio * 100 if status_label == "anomali" else (1.0 - min(ratio, 1.0)) * 100
+            confidence = max(0.0, min(100.0, round(float(raw_conf), 2)))
 
             seg_id       = df.at[i, "segment_id"]
             final_seg_id = (
@@ -486,11 +476,11 @@ def run_analysis():
             qualitative_statuses,
         )
         status_eval = (
-            "Optimal" if silhouette >= 0.70 else
-            "Good"    if silhouette >= 0.50 else
-            "Stable"  if silhouette >= 0.25 else
-            "Low"
-        ) if internal_metrics_available else "Insufficient Clusters"
+            "Strong Cluster Structure" if silhouette >= 0.70 else
+            "Moderate Cluster Structure" if silhouette >= 0.50 else
+            "Weak Cluster Structure" if silhouette >= 0.25 else
+            "No Clear Cluster Structure"
+        ) if internal_metrics_available else "Insufficient Clusters for Internal Metrics"
 
         print(f"Silhouette Score    : {silhouette:.4f}",       file=sys.stderr)
         print(f"Davies-Bouldin Index: {dbi:.4f}",               file=sys.stderr)
@@ -521,8 +511,10 @@ def run_analysis():
             "f1":               round(evaluation["f1"], 3),
             "evaluation": {
                 "ground_truth": "target (0=normal, 1=anomali)",
-                "prediction_rule": "status selain normal diperlakukan sebagai anomali",
+                "prediction_rule": detection_rule,
+                "metric_scope": "Metrik eksternal dihitung terhadap seluruh dataset berlabel dan bukan estimasi performa out-of-sample.",
             },
+            "detection_rule":   detection_rule,
             "internal_metrics_available": internal_metrics_available,
             "data_quality": {
                 "records_read": len(records),
@@ -539,7 +531,7 @@ def run_analysis():
         if algo == "kmeans":
             output_response.update({
                 "iterations":        out_iterations,
-                "random_seed_nodes": out_random_seed_nodes,
+                "random_seed_nodes": None,
                 "final_centroids":   out_final_centroids,
                 "eps":               None,
                 "min_samples":       None

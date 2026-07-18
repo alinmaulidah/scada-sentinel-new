@@ -5,10 +5,16 @@ const parseTimestamp = (val) => {
   if (!val) return null;
   try {
     if (typeof val === "string") {
-      // Input: "01/01/2024 0:00:00" -> Output: "2024-01-01 00:00:00"
-      const [datePart, timePart] = val.split(" ");
-      const [day, month, year] = datePart.split("/");
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart || "00:00:00"}`;
+      const value = val.trim();
+      const localMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:\s+(\d{1,2}:\d{2}(?::\d{2})?))?$/);
+      if (localMatch) {
+        const [, day, month, year, time = "00:00:00"] = localMatch;
+        const normalizedYear = year.length === 2 ? `20${year}` : year;
+        return `${normalizedYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")} ${time.padEnd(8, ":00")}`;
+      }
+      const isoMatch = value.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2})?))?$/);
+      if (isoMatch) return `${isoMatch[1]} ${(isoMatch[2] || "00:00:00").padEnd(8, ":00")}`;
+      return null;
     }
     if (typeof val === "number") {
       // Handle format angka Excel
@@ -27,6 +33,19 @@ const toNum = (v) => {
 };
 
 const toBinary = (value) => ([0, 1].includes(Number(value)) ? Number(value) : null);
+const toIntegerIn = (value, allowed) => (allowed.includes(Number(value)) ? Number(value) : null);
+
+const SENSOR_RANGES = {
+  segment_id: [1, 100000],
+  pressure: [0, 200],
+  flow_rate: [0, 100],
+  temperature: [-50, 150],
+  pump_speed: [0, 5000],
+  energy_consumption: [0, 1000],
+};
+
+const inRange = (value, [min, max]) => value !== null && value >= min && value <= max;
+const field = (item, ...names) => names.map((name) => item[name]).find((value) => value !== undefined && value !== null && value !== "");
 
 // ================= GET DATA (SORT BY ROW INDEX) =================
 const getScadaData = async (req, res) => {
@@ -87,27 +106,47 @@ const importScadaData = async (req, res) => {
     }
 
     const values = rawData.map((item, index) => [
-      parseTimestamp(item.timestamp || item.Timestamp),
-      toNum(item.segment_id || item.segment_ID),
-      toNum(item.pressure || item.Pressure),
-      toNum(item.flow_rate || item.flow_rate),
-      toNum(item.temperature || item.Temperature),
-      toNum(item.valve_status || item.valve_status),
-      toNum(item.pump_state || item.pump_state),
-      toNum(item.pump_speed || item.pump_speed),
-      toNum(item.compressor_state || item.compressor_state),
-      toNum(item.energy_consumption || item.energy_consumption),
-      toBinary(item.alarm_triggered),
-      (item.event_type || "normal").toLowerCase(),
-      toBinary(item.target),
-      index + 1 // Simpan nomor baris asli Excel
+      parseTimestamp(field(item, "timestamp", "Timestamp")),
+      toNum(field(item, "segment_id", "segment_ID", "Segment ID")),
+      toNum(field(item, "pressure", "Pressure")),
+      toNum(field(item, "flow_rate", "Flow Rate")),
+      toNum(field(item, "temperature", "Temperature")),
+      toIntegerIn(field(item, "valve_status", "Valve Status"), [0, 1, 2]),
+      toBinary(field(item, "pump_state", "Pump State")),
+      toNum(field(item, "pump_speed", "Pump Speed")),
+      toBinary(field(item, "compressor_state", "Compressor State")),
+      toNum(field(item, "energy_consumption", "Energy Consumption")),
+      toBinary(field(item, "alarm_triggered", "Alarm Triggered")),
+      String(field(item, "event_type", "Event Type") || "").trim().toLowerCase(),
+      toBinary(field(item, "target", "Target")),
+      index + 1
     ]);
 
-    const invalidRowIndex = values.findIndex((row) => row.slice(0, 13).some((value) => value === null));
+    const invalidRowIndex = values.findIndex((row) => {
+      const [timestamp, segmentId, pressure, flowRate, temperature, valveStatus, pumpState, pumpSpeed, compressorState, energy, alarm, eventType, target] = row;
+      return !timestamp ||
+        !inRange(segmentId, SENSOR_RANGES.segment_id) ||
+        !inRange(pressure, SENSOR_RANGES.pressure) ||
+        !inRange(flowRate, SENSOR_RANGES.flow_rate) ||
+        !inRange(temperature, SENSOR_RANGES.temperature) ||
+        valveStatus === null || pumpState === null ||
+        !inRange(pumpSpeed, SENSOR_RANGES.pump_speed) ||
+        compressorState === null ||
+        !inRange(energy, SENSOR_RANGES.energy_consumption) ||
+        alarm === null || !eventType || target === null;
+    });
     if (invalidRowIndex !== -1) {
       return res.status(400).json({
         success: false,
-        message: `Baris ${invalidRowIndex + 2} memiliki nilai sensor atau label target yang tidak valid.`,
+        message: `Baris ${invalidRowIndex + 2} tidak valid. Pastikan timestamp, status biner, dan rentang sensor sesuai dataset (flow rate 0-100, suhu -50-150, pressure 0-200, pump speed 0-5000, energi 0-1000).`,
+      });
+    }
+
+    const [existing] = await db.execute("SELECT COUNT(*) AS total FROM sensor_logs");
+    if (existing[0].total > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Dataset aktif sudah ada. Kosongkan data terlebih dahulu agar data tidak tercampur atau terduplikasi dengan hasil penelitian sebelumnya.",
       });
     }
 
@@ -123,11 +162,24 @@ const importScadaData = async (req, res) => {
 };
 
 const clearSensorLogs = async (req, res) => {
+  let connection;
   try {
-    await db.execute("TRUNCATE TABLE sensor_logs");
-    res.json({ success: true, message: "Database Cleaned" });
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    // Hasil analisis tidak menyimpan salinan/versi dataset sumber. Karena itu,
+    // hasil lama wajib dihapus ketika data sumber diganti agar tidak menyesatkan.
+    await connection.execute("DELETE FROM algorithm_results");
+    await connection.execute("DELETE FROM sensor_logs");
+    await connection.commit();
+    res.json({
+      success: true,
+      message: "Dataset aktif dan seluruh riwayat hasil analisisnya telah dikosongkan.",
+    });
   } catch (err) {
+    if (connection) await connection.rollback();
     res.status(500).json({ success: false, message: err.message });
+  } finally {
+    if (connection) connection.release();
   }
 };
 

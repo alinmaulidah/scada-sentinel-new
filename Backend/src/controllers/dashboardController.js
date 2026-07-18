@@ -8,10 +8,7 @@ exports.getDashboardStats = async (req, res) => {
     
     // 2. Kirim total ke frontend dengan properti totalRecords
     res.json({
-      totalRecords: total, // <-- DIUBAH DI SINI supaya sinkron dengan frontend
-      corePoints: Math.floor(total * 0.7).toString(),
-      noiseDetected: Math.floor(total * 0.05).toString(),
-      ratios: { core: "70%", border: "25%", noise: "5%" }
+      totalRecords: total,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -19,5 +16,5 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 exports.recalculateDbscan = async (req, res) => {
-    res.json({ message: "Rescan berhasil" });
+    res.status(501).json({ message: "Rescan DBSCAN belum diimplementasikan. Jalankan analisis dari halaman Eksekusi Algoritma." });
 };

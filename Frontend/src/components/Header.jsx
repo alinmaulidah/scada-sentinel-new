@@ -1,35 +1,29 @@
 import React, { useState, useRef, useEffect } from "react";
-import { clearSession } from "../lib/session";
+import { clearSession, getSessionUser, setSessionUser } from "../lib/session";
+import api from "../lib/api";
 
 import {
-  Bell,
   UserCircle,
   ChevronDown,
   Settings,
   LogOut,
   User,
-  Shield,
   Clock3,
-  AlertTriangle,
+  Menu,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
 
-const Header = ({ activePage, onLogin }) => {
+const Header = ({ activePage, onLogin, onToggleSidebar }) => {
 
   const navigate = useNavigate();
 
   const [isProfileOpen, setIsProfileOpen] =
     useState(false);
 
-  const [isNotifOpen, setIsNotifOpen] =
-    useState(false);
-
   const [time, setTime] = useState(new Date());
 
   const dropdownRef = useRef(null);
-
-  const notifRef = useRef(null);
 
   /* =========================
      REALTIME CLOCK
@@ -60,12 +54,6 @@ const Header = ({ activePage, onLogin }) => {
         setIsProfileOpen(false);
       }
 
-      if (
-        notifRef.current &&
-        !notifRef.current.contains(event.target)
-      ) {
-        setIsNotifOpen(false);
-      }
     };
 
     document.addEventListener(
@@ -81,32 +69,25 @@ const Header = ({ activePage, onLogin }) => {
 
   }, []);
 
-  /* =========================
-     MOCK NOTIFICATION
-  ========================= */
+  const [profile, setProfile] = useState(() => getSessionUser() || {});
 
-  const notifications = [
-    {
-      id: 1,
-      title: "Leak Detected",
-      desc: "Pressure dropped drastically",
-      time: "2 min ago",
-    },
+  useEffect(() => {
+    let active = true;
+    const syncProfile = () => {
+      api.get("/profile").then(({ data }) => {
+        if (!active || !data?.success) return;
+        setProfile(data.data);
+        setSessionUser({ ...getSessionUser(), ...data.data });
+      }).catch(() => {});
+    };
 
-    {
-      id: 2,
-      title: "Blockage Warning",
-      desc: "Flow rate unstable",
-      time: "10 min ago",
-    },
-
-    {
-      id: 3,
-      title: "DBSCAN Completed",
-      desc: "Analysis finished successfully",
-      time: "15 min ago",
-    },
-  ];
+    syncProfile();
+    window.addEventListener("profile-updated", syncProfile);
+    return () => {
+      active = false;
+      window.removeEventListener("profile-updated", syncProfile);
+    };
+  }, []);
 
   /* =========================
      LOGOUT
@@ -137,33 +118,39 @@ const Header = ({ activePage, onLogin }) => {
 
       <div className="h-[2px] bg-gradient-to-r from-[#336B87] via-cyan-400 to-[#336B87]"></div>
 
-      <div className="h-20 bg-white/70 backdrop-blur-2xl border-b border-slate-200 px-8 flex items-center justify-between shadow-sm">
+      <div className="min-h-16 bg-white/70 backdrop-blur-2xl border-b border-slate-200 px-3 py-3 sm:h-20 sm:px-6 lg:px-8 flex items-center justify-between shadow-sm gap-3">
 
         {/* LEFT */}
 
-        <div className="flex flex-col">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <button onClick={onToggleSidebar} className="md:hidden p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100" aria-label="Buka menu navigasi">
+            <Menu size={20} />
+          </button>
+          <div className="min-w-0 flex flex-col">
 
-          <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-[0.08em] sm:gap-2 sm:tracking-[0.2em]">
 
-            <span>Pipe-Analytica</span>
+            <img src="/logo-pipeline.png" alt="Pipeline Analytica" className="w-5 h-5 object-contain" />
 
-            <span>/</span>
+            <span className="hidden sm:inline">Pipeline Analytica</span>
 
-            <span className="text-[#336B87]">
+            <span className="hidden sm:inline">/</span>
+
+            <span className="truncate text-[#336B87]">
               {activePage}
             </span>
 
           </div>
 
-          <h2 className="text-xl font-black text-slate-800 capitalize mt-1">
+          <h2 className="truncate text-base sm:text-xl font-black text-slate-800 capitalize mt-1">
             {activePage.replace("-", " ")}
           </h2>
-
+          </div>
         </div>
 
         {/* RIGHT */}
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-2 sm:gap-5 shrink-0">
 
           {/* CLOCK */}
 
@@ -187,92 +174,14 @@ const Header = ({ activePage, onLogin }) => {
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
 
             <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">
-              System Active
+              Mode Penelitian
             </span>
 
           </div>
 
           {/* PROFILE AREA */}
 
-          <div className="flex items-center gap-4 border-l border-slate-200 pl-5">
-
-            {/* NOTIFICATION */}
-
-            <div className="relative" ref={notifRef}>
-
-              <button
-                onClick={() =>
-                  setIsNotifOpen(!isNotifOpen)
-                }
-                className="relative p-3 text-slate-400 hover:text-[#336B87] hover:bg-blue-50 rounded-2xl transition-all"
-              >
-
-                <Bell size={19} />
-
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-
-              </button>
-
-              {/* NOTIF DROPDOWN */}
-
-              {isNotifOpen && (
-
-                <div className="absolute top-full right-0 mt-4 w-80 bg-white rounded-[1.8rem] shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-
-                  <div className="px-5 py-4 border-b border-slate-100">
-
-                    <h3 className="text-sm font-black text-slate-800">
-                      Notifications
-                    </h3>
-
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto">
-
-                    {notifications.map((notif) => (
-
-                      <div
-                        key={notif.id}
-                        className="px-5 py-4 border-b border-slate-50 hover:bg-slate-50 transition-all cursor-pointer"
-                      >
-
-                        <div className="flex items-start gap-3">
-
-                          <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-500 flex items-center justify-center">
-
-                            <AlertTriangle size={18} />
-
-                          </div>
-
-                          <div className="flex-1">
-
-                            <h4 className="text-sm font-black text-slate-800">
-                              {notif.title}
-                            </h4>
-
-                            <p className="text-xs text-slate-500 mt-1">
-                              {notif.desc}
-                            </p>
-
-                            <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
-                              {notif.time}
-                            </p>
-
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-              )}
-
-            </div>
+          <div className="flex items-center gap-2 sm:gap-4 border-l border-slate-200 pl-3 sm:pl-5">
 
             {/* PROFILE */}
 
@@ -291,11 +200,11 @@ const Header = ({ activePage, onLogin }) => {
                 <div className="text-right hidden sm:block">
 
                   <p className="text-xs font-black text-slate-800">
-                    Administrator
+                    {profile.username || "Administrator"}
                   </p>
 
                   <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">
-                    SCADA Engineer
+                    {profile.role || "SCADA Engineer"}
                   </p>
 
                 </div>
@@ -334,7 +243,7 @@ const Header = ({ activePage, onLogin }) => {
                     </p>
 
                     <p className="text-sm font-black text-slate-800 mt-1">
-                      admin@pipeanalytica.io
+                      {profile.email || "Email belum dikonfigurasi"}
                     </p>
 
                   </div>
@@ -346,14 +255,6 @@ const Header = ({ activePage, onLogin }) => {
                       label="My Profile"
                       onClick={() =>
                         navigate("/myprofile")
-                      }
-                    />
-
-                    <DropdownItem
-                      icon={<Shield size={16} />}
-                      label="Security"
-                      onClick={() =>
-                        navigate("/security")
                       }
                     />
 

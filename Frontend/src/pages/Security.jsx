@@ -85,16 +85,15 @@ const Security = () => {
 
   return (
     <div className="space-y-6 font-sans text-slate-600">
-      {/* HEADER */}
       <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
         <div className="flex items-center gap-5">
-          <div className="w-20 h-20 rounded-[2rem] bg-[#336B87]/10 flex items-center justify-center text-[#336B87]">
-            <ShieldCheck size={42} />
+          <div className="w-16 h-16 rounded-[1.5rem] bg-[#336B87]/10 flex items-center justify-center text-[#336B87]">
+            <ShieldCheck size={32} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-800">Security Center</h1>
+            <h2 className="text-2xl font-black text-slate-800">Keamanan Akun</h2>
             <p className="text-slate-500 font-semibold mt-2">
-              Manage account password and login security
+              Kelola kata sandi dan perlindungan akun.
             </p>
           </div>
         </div>

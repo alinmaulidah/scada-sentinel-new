@@ -1,184 +1,39 @@
-import React, { useState, useCallback } from "react";
-import {
-  AlertTriangle,
-  ShieldAlert,
-  Zap,
-  TrendingDown,
-  Bell,
-  CheckCheck,
-  X,
-  ChevronRight,
-} from "lucide-react";
+import React, { useState } from "react";
+import { AlertTriangle, CheckCheck, X } from "lucide-react";
 
-/**
- * ALERT BANNER — EARLY WARNING SYSTEM
- * =====================================
- * Komponen notifikasi real-time yang otomatis muncul
- * ketika terdeteksi anomali kritis (High severity).
- *
- * Fitur:
- * - Muncul otomatis dalam 3 detik setelah ada data baru
- * - Berkedip (pulse animation) untuk menarik perhatian operator
- * - Tombol "Acknowledge" untuk mensimulasikan respons lapangan
- * - Menampilkan jumlah & tipe insiden kritis
- *
- * Justifikasi Akademis:
- * Sistem peringatan dini adalah komponen vital SCADA Control Room.
- * Operator harus mengetahui insiden kritis dalam < 10 detik (ANSI/ISA-18.2).
- */
-
-const SEVERITY_CONFIG = {
-  High: {
-    icon: ShieldAlert,
-    bg: "from-red-600 to-red-700",
-    border: "border-red-400",
-    text: "text-red-50",
-    pulse: true,
-  },
-  Medium: {
-    icon: AlertTriangle,
-    bg: "from-amber-500 to-amber-600",
-    border: "border-amber-400",
-    text: "text-amber-50",
-    pulse: false,
-  },
-  Safe: {
-    icon: Bell,
-    bg: "from-emerald-500 to-emerald-600",
-    border: "border-emerald-400",
-    text: "text-emerald-50",
-    pulse: false,
-  },
-};
-
+/** Menandai hasil model yang perlu ditinjau; bukan alarm operasional. */
 export default function AlertBanner({ logs = [] }) {
-  const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
   const [dismissed, setDismissed] = useState(false);
+  const anomalyLogs = logs.filter((log) => log.prediction !== "Normal");
 
-  // Hitung log kritis yang BELUM di-acknowledge
-  const criticalLogs = logs.filter(
-    (l) =>
-      (l.severity === "High" || l.prediction === "Surge" || l.prediction === "Leak") &&
-      !acknowledgedIds.has(l.id)
-  );
-
-  const mediumLogs = logs.filter(
-    (l) =>
-      l.severity === "Medium" &&
-      !acknowledgedIds.has(l.id)
-  );
-
-  const handleAcknowledge = useCallback(() => {
-    const allCriticalIds = new Set([
-      ...acknowledgedIds,
-      ...criticalLogs.map((l) => l.id),
-      ...mediumLogs.map((l) => l.id),
-    ]);
-    setAcknowledgedIds(allCriticalIds);
-  }, [acknowledgedIds, criticalLogs, mediumLogs]);
-
-  const handleDismiss = useCallback(() => {
-    setDismissed(true);
-  }, []);
-
-  // Kondisi tidak ada alert
-  if (dismissed || (criticalLogs.length === 0 && mediumLogs.length === 0)) {
-    // Tampilkan banner hijau "System Normal" jika tidak ada insiden
-    if (dismissed && criticalLogs.length === 0) {
-      return (
-        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700">
-          <Bell size={14} />
-          Sistem dalam kondisi aman. Tidak ada insiden kritis terdeteksi.
-          <button
-            onClick={() => setDismissed(false)}
-            className="ml-auto text-emerald-500 hover:text-emerald-800 underline text-[10px]"
-          >
-            Reset Alert
-          </button>
-        </div>
-      );
-    }
-    return null;
-  }
-
-  const hasCritical = criticalLogs.length > 0;
-  const cfg = SEVERITY_CONFIG[hasCritical ? "High" : "Medium"];
-  const Icon = cfg.icon;
+  if (dismissed || anomalyLogs.length === 0) return null;
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-xl border-2 ${cfg.border} bg-gradient-to-r ${cfg.bg} shadow-lg ${
-        cfg.pulse ? "animate-pulse" : ""
-      }`}
-    >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.15) 10px, rgba(255,255,255,0.15) 20px)",
-        }}
-      />
-
-      <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-3.5">
-        {/* Kiri: Icon + Teks */}
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${cfg.text} bg-white/20`}>
-            <Icon size={18} />
+    <div className="relative rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+            <AlertTriangle size={17} />
           </div>
-          <div className={cfg.text}>
-            <p className="text-sm font-black leading-tight">
-              {hasCritical
-                ? `PERINGATAN KRITIS - ${criticalLogs.length} Insiden Aktif`
-                : `PERHATIAN — ${mediumLogs.length} Insiden Sedang`}
-            </p>
-            <p className="text-[11px] opacity-90 mt-0.5">
-              {hasCritical
-                ? `Terdeteksi ${criticalLogs.filter((l) => l.prediction === "Surge").length} Surge & ${criticalLogs.filter((l) => l.prediction === "Leak").length} Leak. Segera lakukan tindakan!`
-                : `Beberapa parameter menunjukkan deviasi dari batas normal.`}
+          <div>
+            <p className="text-sm font-black">{anomalyLogs.length} observasi ditandai anomali</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
+              Ini adalah keluaran model pada dataset penelitian, bukan alarm real-time atau diagnosis kondisi fisik pipa.
             </p>
           </div>
         </div>
-
-        {/* Kanan: Tombol Aksi */}
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={handleAcknowledge}
-            className="flex items-center gap-1.5 px-4 py-2 bg-white text-red-700 hover:bg-red-50 rounded-lg text-xs font-black transition-all shadow-sm active:scale-95"
+            onClick={() => setDismissed(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-bold text-amber-800 border border-amber-200 hover:bg-amber-100"
           >
-            <CheckCheck size={14} />
-            Acknowledge Alert
+            <CheckCheck size={14} /> Tandai ditinjau
           </button>
-          <button
-            onClick={handleDismiss}
-            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            title="Tutup sementara"
-          >
+          <button onClick={() => setDismissed(true)} className="p-2 text-amber-700 hover:bg-amber-100 rounded-lg" title="Tutup sementara">
             <X size={16} />
           </button>
         </div>
       </div>
-
-      {/* Daftar Ringkas Insiden */}
-      {criticalLogs.length > 0 && (
-        <div className="relative border-t border-white/20 px-5 py-2">
-          <div className="flex flex-wrap gap-2">
-            {criticalLogs.slice(0, 5).map((log) => (
-              <span
-                key={log.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/15 text-white rounded-md text-[10px] font-bold"
-              >
-                <ChevronRight size={10} />
-                {log.prediction} @ seg-{log.segment_id || "?"}
-              </span>
-            ))}
-            {criticalLogs.length > 5 && (
-              <span className="text-[10px] text-white/70 font-bold">
-                +{criticalLogs.length - 5} lainnya
-              </span>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

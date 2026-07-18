@@ -97,9 +97,10 @@ export default function MyProfile() {
       if (response.data?.success) {
         setMessage({ text: response.data.message || "Profil berhasil diperbarui!", type: "success" });
         
-        // Update Local Storage jika username berubah agar sinkron dengan sidebar/navbar
-        const updatedSession = { ...sessionUser, username: formData.username };
+        // Sinkronkan identitas yang ditampilkan pada sidebar dan header.
+        const updatedSession = { ...sessionUser, username: formData.username, email: formData.email };
         setSessionUser(updatedSession);
+        window.dispatchEvent(new Event("profile-updated"));
 
         // Ambil ulang data profil segar dari database
         await fetchUserProfile();

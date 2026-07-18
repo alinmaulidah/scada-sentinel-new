@@ -9,6 +9,7 @@ const enrichDetails = (details, isNormalFromAlgorithm) => details.map((item) => 
     ...item,
     prediction: insight.prediction,
     severity: insight.severity,
+    pattern: insight.pattern,
     insight: {
       reason: insight.reason,
       impact: insight.impact,

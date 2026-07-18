@@ -7,7 +7,6 @@ import {
   Waves,
   Thermometer,
   Cpu,
-  Sparkles,
   ShieldAlert,
   Activity,
   CheckCircle2,
@@ -18,13 +17,10 @@ import {
   AlertTriangle,
   Info,
   X,
-  HelpCircle,
-  MapPin,
   RefreshCw
 } from "lucide-react";
 import { runAlgorithm } from "../features/algorithm/algorithm.api";
-
-const PRIMARY_COLOR = "#336B87";
+import { getAppSettings } from "../lib/appSettings";
 
 const AlgorithmExecution = () => {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("kmeans");
@@ -43,27 +39,23 @@ const AlgorithmExecution = () => {
     min_samples: "-",
     status: "",
     anomaly_details: [],
-    iterations: 0,
+    iterations: "-",
+    detection_rule: "",
     random_seed_nodes: [],
     final_centroids: []
   });
 
   const handleRun = async () => {
+    if (!getAppSettings().aiDetection) {
+      alert("Eksekusi analisis dinonaktifkan pada Settings. Aktifkan kembali untuk menjalankan algoritma.");
+      return;
+    }
     setIsLoading(true);
     try {
       const { data } = await runAlgorithm({
         algorithm: selectedAlgorithm,
         normalization: selectedNormalization,
       });
-
-        const fallbackSeeds = [
-          { label: "Centroid 1 (Baris #42)", pressure: 0.15, flow_rate: 0.72 },
-          { label: "Centroid 2 (Baris #118)", pressure: 0.88, flow_rate: 0.14 }
-        ];
-        const fallbackCentroids = [
-          { label: "Kluster 1 (Normal)", pressure: 0.12, flow_rate: 0.79 },
-          { label: "Kluster 2 (Anomali)", pressure: 0.82, flow_rate: 0.19 }
-        ];
 
         setExecutionResult({
           algorithm: data.algorithm,
@@ -76,9 +68,10 @@ const AlgorithmExecution = () => {
           min_samples: data.min_samples || "-",
           status: data.status,
           anomaly_details: data.anomaly_details || [],
-          iterations: data.iterations || 5, 
-          random_seed_nodes: data.random_seed_nodes?.length ? data.random_seed_nodes : fallbackSeeds,
-          final_centroids: data.final_centroids?.length ? data.final_centroids : fallbackCentroids
+          iterations: data.iterations ?? "-",
+          detection_rule: data.detection_rule || "-",
+          random_seed_nodes: data.random_seed_nodes || [],
+          final_centroids: data.final_centroids || []
         });
     } catch (error) {
       console.error(error);
@@ -91,7 +84,7 @@ const AlgorithmExecution = () => {
   const currentAlgo = executionResult.algorithm?.toLowerCase().replace(/[^a-z]/g, "") || "";
 
   return (
-    <div className="space-y-6 pt-2 max-w-[1600px] mx-auto px-4 sm:px-6 text-slate-800">
+    <div className="space-y-4 sm:space-y-6 pt-2 max-w-[1600px] mx-auto px-3 sm:px-6 text-slate-800">
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start relative">
 
         {/* LEFT PANEL: CONFIGURATION */}
@@ -120,8 +113,8 @@ const AlgorithmExecution = () => {
                 </button>
               </div>
               <div className="mt-3 text-xs text-slate-600 space-y-2 leading-relaxed">
-                <p className="font-bold text-slate-800">Kenapa hasil clustering berubah-ubah?</p>
-                <p>Khusus K-Means, sistem menarik koordinat awal secara <span className="font-bold text-amber-600">acak murni</span> dari baris log data sensor untuk modal inisialisasi awal (*random seeds*), sehingga hasil konvergensinya dinamis.</p>
+                <p className="font-bold text-slate-800">Reproduksibilitas eksperimen</p>
+                <p>K-Means menggunakan inisialisasi <span className="font-bold text-amber-600">k-means++</span> dengan <span className="font-bold text-amber-600">random state 42</span>, sehingga konfigurasi dan data yang sama menghasilkan keluaran yang sama.</p>
               </div>
             </div>
           )}
@@ -248,28 +241,33 @@ const AlgorithmExecution = () => {
                   )}
                 </div>
 
+                <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                  <span className="font-black text-slate-800">Aturan deteksi:</span> {executionResult.detection_rule}
+                </p>
+
                 {/* LOG DATA CENTROID (Hanya Muncul di K-Means) */}
-                {currentAlgo === "kmeans" && (
+                {currentAlgo === "kmeans" && executionResult.final_centroids.length > 0 && (
                   <div className="mt-6 p-4 rounded-2xl bg-amber-50/40 border border-amber-200">
                     <div className="flex items-start gap-2 mb-3">
-                      <MapPin size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <Target size={16} className="text-amber-600 shrink-0 mt-0.5" />
                       <div className="w-full">
                         <div className="flex items-center gap-1.5">
                           <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
-                            Centroid Tracking Log & Seed Nodes
+                            Centroid Akhir K-Means
                           </h4>
                           <div className="group relative cursor-pointer text-slate-400 hover:text-slate-600">
-                            <HelpCircle size={13} />
+                            <Info size={13} />
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 bg-slate-900 text-white text-[10px] rounded-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 font-normal leading-relaxed shadow-xl">
-                              Koordinat Iterasi 1 murni ditarik acak dari baris DB sensor. Ini alasan nilai inisialisasi tidak statis seperti hitungan manual di kertas.
+                              Sistem menampilkan centroid akhir hasil model. Seed internal k-means++ tidak dipresentasikan sebagai data sensor agar tidak menimbulkan interpretasi keliru.
                             </span>
                           </div>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">Memantau pergeseran nilai parameter sensor dari inisialisasi awal ke bentuk konvergen (stabil).</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Nilai centroid akhir dalam satuan asli untuk empat fitur analisis; ini bukan satu segment tertentu.</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {executionResult.random_seed_nodes.length > 0 && (
                       <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
                         <p className="text-[10px] font-black text-amber-700 uppercase mb-2">🎲 Titik Acak Inisial (Iterasi 1)</p>
                         <div className="space-y-1.5 text-xs font-medium">
@@ -281,14 +279,20 @@ const AlgorithmExecution = () => {
                           ))}
                         </div>
                       </div>
+                      )}
 
                       <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
                         <p className="text-[10px] font-black text-emerald-700 uppercase mb-2">🏁 Titik Pusat Akhir (Konvergen)</p>
                         <div className="space-y-1.5 text-xs font-medium">
                           {executionResult.final_centroids.map((centroid, idx) => (
-                            <div key={idx} className="flex justify-between border-b border-slate-100 pb-1 text-slate-600">
+                            <div key={idx} className="flex flex-col gap-1 border-b border-slate-100 pb-2 text-slate-600">
                               <span className="font-bold text-slate-700">{centroid.label}</span>
-                              <span className="font-mono text-[11px] text-slate-500">P: {centroid.pressure} | FR: {centroid.flow_rate}</span>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-slate-500">
+                                <span>P: {centroid.pressure} bar</span>
+                                <span>FR: {centroid.flow_rate} m³/h</span>
+                                <span>T: {centroid.temperature} °C</span>
+                                <span>PS: {centroid.pump_speed} rpm</span>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -302,7 +306,7 @@ const AlgorithmExecution = () => {
                   <div className="flex items-center gap-2 mb-3">
                     <AlertTriangle className="text-red-500 shrink-0" size={16} />
                     <div>
-                      <h3 className="text-sm font-black text-slate-900">Anomaly Detection Real-time Log</h3>
+                      <h3 className="text-sm font-black text-slate-900">Log Hasil Deteksi Anomali</h3>
                       <p className="text-[11px] text-slate-400">Daftar baris data sensor yang teridentifikasi menyimpang oleh algoritma</p>
                     </div>
                   </div>

@@ -47,14 +47,18 @@ export default function Dashboard() {
       const jsonAlgo = resAlgo.data || [];
 
       // KODE BARU — tambahkan davies_bouldin
-const formatted = jsonAlgo.map((d, i) => ({
-  id: i + 1,
-  algorithm: d.algorithm,
-  normalization: d.normalization,
-  anomaly: Number(d.anomaly || 0),
-  score: d.silhouette,
-  dbi: Number(d.davies_bouldin || 0), // tambahkan ini
-}));
+      const formatted = jsonAlgo.map((d, i) => ({
+        id: i + 1,
+        algorithm: d.algorithm,
+        normalization: d.normalization,
+        anomaly: Number(d.anomaly || 0),
+        score: Number(d.silhouette || 0),
+        dbi: Number(d.davies_bouldin || 0),
+        accuracy: Number(d.accuracy || 0),
+        precision: Number(d.precision_score || 0),
+        recall: Number(d.recall_score || 0),
+        f1: Number(d.f1_score || 0),
+      }));
       setData(formatted);
 
       const resScada = await getScadaRecordCount();
@@ -84,26 +88,26 @@ const formatted = jsonAlgo.map((d, i) => ({
     const isKmeans = bestModel.algorithm.toLowerCase().includes("k-means") || bestModel.algorithm.toLowerCase().includes("kmeans");
     const anomalyCount = bestModel.anomaly;
 
-    let textInsight = `Evaluasi model terbaik menetapkan ${bestModel.algorithm} dengan standardisasi ${bestModel.normalization}. `;
+    let textInsight = `Konfigurasi dengan Silhouette Score tertinggi adalah ${bestModel.algorithm} dengan standardisasi ${bestModel.normalization}. `;
 
     // Evaluasi Kedekatan Jarak Klaster Secara Akademis
     if (bestModel.score >= 0.5) {
-      textInsight += "Struktur klasterisasi dinilai solid, valid, dan memiliki pemisahan jarak antar-klaster yang kuat (Substantial Structure). ";
+      textInsight += "Struktur klaster menunjukkan pemisahan internal yang kuat menurut Silhouette Score. ";
     } else if (bestModel.score >= 0.25) {
-      textInsight += "Struktur klaster tergolong lemah (Weak Structure). Diperlukan evaluasi fitur kausalitas data sensor kembali. ";
+      textInsight += "Struktur klaster tergolong lemah; hasil perlu dibandingkan dengan konfigurasi lain dan metrik eksternal. ";
     } else {
-      textInsight += "Kerapatan jarak rendah (No Substantial Structure). Disarankan untuk melakukan tuning ulang hyperparameter model. ";
+      textInsight += "Pemisahan internal klaster rendah. Hasil perlu ditafsirkan secara hati-hati dan dibandingkan kembali dengan konfigurasi lain. ";
     }
 
     // Deteksi Causal Analysis Berdasarkan Metode Algoritma Terpilih
     if (anomalyCount > 0) {
       if (isKmeans) {
-        textInsight += `Sistem mendeteksi ${anomalyCount} data pencilan (outliers) berdasarkan jarak Euclidean terjauh dari centroid klaster utama. Periksa potensi penyimpangan drastis pada parameter Pressure atau Flow Rate.`;
+        textInsight += `Model menandai ${anomalyCount} observasi sebagai anomali karena jaraknya melebihi ambang ke centroid terdekat pada empat fitur: pressure, flow rate, temperature, dan pump speed.`;
       } else {
-        textInsight += `Sistem mengisolasi ${anomalyCount} titik data sebagai anomali (noise) berdasarkan pemetaan densitas kerapatan rendah lingkungan. Segera investigasi log operasional sensor terkait.`;
+        textInsight += `Model menandai ${anomalyCount} observasi sebagai anomali karena merupakan noise menurut kepadatan DBSCAN. Hasil perlu ditinjau kembali pada log data.`;
       }
     } else {
-      textInsight += "Seluruh parameter log operasional berada di dalam radius klaster aman (Safe State/Kondisi Normal).";
+      textInsight += "Tidak ada observasi yang ditandai anomali oleh aturan model pada eksekusi ini.";
     }
 
     setAiInsight(textInsight);
@@ -141,15 +145,15 @@ const formatted = jsonAlgo.map((d, i) => ({
 
   // Pembagian Status Tingkat Bahaya Anomali secara Visual Dinamis
   const getAnomalyStatusColor = (count) => {
-    if (!count || count === 0) return { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100", label: "SAFE OPERATIONAL" };
-    if (count <= 5) return { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100", label: "WARNING / POTENTIAL FAULT" };
-    return { bg: "bg-red-50", text: "text-red-500", border: "border-red-100", label: "CRITICAL ANOMALY DETECTED" };
+    if (!count || count === 0) return { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100", label: "TIDAK ADA ANOMALI TERDETEKSI" };
+    if (count <= 5) return { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100", label: "ANOMALI TERDETEKSI" };
+    return { bg: "bg-red-50", text: "text-red-500", border: "border-red-100", label: "JUMLAH ANOMALI TINGGI" };
   };
 
   const currentStatus = getAnomalyStatusColor(best?.anomaly);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6 font-sans text-slate-600 antialiased">
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-4 md:p-6 font-sans text-slate-600 antialiased">
       <div className="max-w-[1600px] mx-auto space-y-5">
         
         {/* ================= PANEL PANDUAN INTERAKTIF (SENTINEL GUIDE) ================= */}
@@ -216,6 +220,22 @@ const formatted = jsonAlgo.map((d, i) => ({
                           </div>
                         ))}
                       </div>
+
+                      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-[11px] leading-relaxed text-slate-600">
+                        <p className="font-black text-blue-800">Transparansi penggunaan sampel</p>
+                        <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+                          <li><strong>Eksperimen utama:</strong> gunakan <code>dataset-pipeline.xlsx</code> berisi 1.000 observasi.</li>
+                          <li><strong>Sampel demo:</strong> dibuat <em>di luar website</em> dengan <code>scripts/create_stratified_sample.js</code>, bukan otomatis saat impor.</li>
+                          <li>Skrip memakai <strong>random stratified sampling</strong> berdasarkan <code>event_type</code>, seed 42, lalu menyusun kembali baris menurut urutan sumber agar timestamp asli tetap berurutan.</li>
+                          <li>Unggah hasilnya, <code>scada_stratified_500_seed42.xlsx</code>, melalui menu <strong>Data Management</strong>. Website hanya mengimpor dan memvalidasi berkas.</li>
+                        </ol>
+                        <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-center text-[10px] font-bold">
+                          {[["Normal", 347], ["Degradation", 68], ["Leak", 32], ["Surge", 30], ["Blockage", 23]].map(([label, count]) => (
+                            <span key={label} className="rounded border border-blue-100 bg-white px-1.5 py-1">{label}: {count}</span>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-[10px] text-blue-700"><Info size={11} className="mr-1 inline" />Sampel mempertahankan proporsi kelas, tetapi ada timestamp yang tidak terpilih. Karena itu, jangan memakai sampel acak untuk membuktikan tren waktu kontinu seperti surge atau degradation.</p>
+                      </div>
                     </div>
                   )}
 
@@ -236,7 +256,7 @@ const formatted = jsonAlgo.map((d, i) => ({
                         ))}
                       </div>
                       <p className="text-[11px] text-slate-400 font-medium italic flex items-center gap-1">
-                        <Info size={12} /> *Keempat matriks di atas merupakan variabel kausal fisik penentu jenis gangguan utama (Surge, Leak, Blockage, Degradation).
+                        <Info size={12} /> *Keempat variabel di atas adalah fitur sensor yang digunakan model untuk membentuk cluster dan mendeteksi anomali.
                       </p>
                     </div>
                   )}
@@ -258,7 +278,7 @@ const formatted = jsonAlgo.map((d, i) => ({
                       <span className="text-[9px] bg-orange-50 text-orange-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-orange-100">Tahap Rekapitulasi</span>
                       <h3 className="text-xs font-bold text-slate-800">Penetapan Konfigurasi Model Terbaik di Dashboard</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Halaman ini secara otomatis menyeleksi hasil kalkulasi dengan Silhouette Score tertinggi sebagai acuan utama. Hasil keputusan ini disalurkan ke dalam grafik sebaran serta modul AI Advisor untuk melahirkan saran teknis preventif yang objektif.
+                        Halaman ini mengurutkan hasil berdasarkan Silhouette Score sebagai metrik struktur internal. Ringkasan otomatis membantu membaca hasil, tetapi keputusan operasional tetap memerlukan verifikasi domain dan metrik eksternal.
                       </p>
                     </div>
                   )}
@@ -284,7 +304,7 @@ const formatted = jsonAlgo.map((d, i) => ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div style={{ backgroundColor: PRIMARY_COLOR }} className="p-4 rounded-xl text-white shadow-2xs flex flex-col justify-between min-h-[105px]">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-100">Best Model Selected</span>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-100">Silhouette Tertinggi</span>
               <Cpu size={16} className="opacity-75" />
             </div>
             <div className="text-xl font-black tracking-tight mt-1 truncate">
@@ -317,7 +337,7 @@ const formatted = jsonAlgo.map((d, i) => ({
               {loading ? "..." : totalLogs.toLocaleString()} <span className="text-xs text-slate-400 font-sans font-medium">Rows</span>
             </div>
             <div className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded w-max">
-              Continuous SCADA Logging
+              Dataset yang Diimpor
             </div>
           </div>
 
@@ -340,8 +360,8 @@ const formatted = jsonAlgo.map((d, i) => ({
           <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-slate-100">
               <div>
-                <h2 className="text-sm font-black text-slate-800">Visualisasi Sebaran Efisiensi Model</h2>
-                <p className="text-[11px] text-slate-400 font-medium">Pemetaan hubungan koordinat jumlah deteksi anomali terhadap akurasi skor validitas</p>
+                <h2 className="text-sm font-black text-slate-800">Sebaran Hasil Eksperimen</h2>
+                <p className="text-[11px] text-slate-400 font-medium">Hubungan jumlah anomali terdeteksi dan Silhouette Score sebagai metrik struktur internal.</p>
               </div>
               {best && (
                 <div className="flex gap-1.5 text-[10px] font-bold">
@@ -387,11 +407,11 @@ const formatted = jsonAlgo.map((d, i) => ({
             </div>
           </div>
 
-          {/* Rangkuman Konfigurasi Terbaik & AI Advisor */}
+          {/* Rangkuman Konfigurasi Terbaik */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between space-y-4">
             <div>
-              <h2 className="text-sm font-black text-slate-800">Summary Pemodelan Terbaik</h2>
-              <p className="text-[11px] text-slate-400 font-medium pb-2 border-b border-slate-100">Kalkulasi hyperparameter otomatis paling optimal</p>
+              <h2 className="text-sm font-black text-slate-800">Ringkasan Konfigurasi Silhouette Tertinggi</h2>
+              <p className="text-[11px] text-slate-400 font-medium pb-2 border-b border-slate-100">Dipilih berdasarkan Silhouette Score, bukan klaim performa keseluruhan.</p>
               
               {best ? (
                 <div className="mt-3 space-y-2">
@@ -431,6 +451,20 @@ const formatted = jsonAlgo.map((d, i) => ({
     </span>
   </div>
 </div>
+<div className="grid grid-cols-2 gap-2 text-xs">
+  {[
+    ["Accuracy", best.accuracy],
+    ["Precision", best.precision],
+    ["Recall", best.recall],
+    ["F1 Score", best.f1],
+  ].map(([label, value]) => (
+    <div key={label} className="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+      <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">{label}</span>
+      <span className="font-black text-slate-700 font-mono text-sm">{value.toFixed(3)}</span>
+    </div>
+  ))}
+</div>
+<p className="text-[10px] text-slate-400">Metrik eksternal dihitung terhadap target dataset, bukan performa out-of-sample.</p>
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 italic mt-4">Belum ada riwayat komparasi yang terekam di sistem database.</p>
@@ -440,7 +474,7 @@ const formatted = jsonAlgo.map((d, i) => ({
             <div className={`p-3.5 rounded-xl border ${best?.anomaly > 0 ? "bg-red-50/40 border-red-100" : "bg-slate-50 border-slate-200/80"}`}>
               <h3 style={{ color: PRIMARY_COLOR }} className="text-[10px] font-black uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 {best?.anomaly > 0 ? <ShieldAlert size={12} className="text-red-500" /> : <CheckCircle2 size={12} className="text-emerald-500" />}
-                 Sentinel AI Advisor
+                 Ringkasan Otomatis
               </h3>
               <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
                 {aiInsight || "Menunggu kalkulasi evaluasi matriks algoritma untuk menyusun rekomendasi..."}
@@ -455,7 +489,7 @@ const formatted = jsonAlgo.map((d, i) => ({
           <div className="p-4 border-b border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-800">Matriks Perbandingan Algoritma</h2>
-              <p className="text-[11px] text-slate-400 font-medium">Urutan performa seluruh konfigurasi model berdasarkan kriteria Silhouette Score tertinggi</p>
+              <p className="text-[11px] text-slate-400 font-medium">Diurutkan berdasarkan Silhouette Score; metrik eksternal ditampilkan sebagai pembanding.</p>
             </div>
             
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -484,6 +518,10 @@ const formatted = jsonAlgo.map((d, i) => ({
     <th className="p-4 pl-5">Algoritma & Model Setup</th>
     <th className="p-4">Normalisasi Fitur</th>
     <th className="p-4 text-center">Deteksi Anomali</th>
+    <th className="p-4 text-center">Accuracy</th>
+    <th className="p-4 text-center">Precision</th>
+    <th className="p-4 text-center">Recall</th>
+    <th className="p-4 text-right pr-5">F1 Score</th>
     <th className="p-4 text-center">Silhouette Score ↑</th>
     <th className="p-4 text-right pr-5">Davies-Bouldin ↓</th>
   </tr>
@@ -497,7 +535,7 @@ const formatted = jsonAlgo.map((d, i) => ({
     {d.algorithm}
     {i === 0 && (
       <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-2 py-0.5 rounded border border-emerald-200">
-        OPTIMAL CONFIG
+        SILHOUETTE TERTINGGI
       </span>
     )}
   </td>
@@ -505,6 +543,10 @@ const formatted = jsonAlgo.map((d, i) => ({
   <td className="p-4 text-center font-bold text-red-500 font-mono">
     {d.anomaly} Pts
   </td>
+  <td className="p-4 text-center font-mono">{d.accuracy.toFixed(3)}</td>
+  <td className="p-4 text-center font-mono">{d.precision.toFixed(3)}</td>
+  <td className="p-4 text-center font-mono">{d.recall.toFixed(3)}</td>
+  <td className="p-4 text-right pr-5 font-mono">{d.f1.toFixed(3)}</td>
   <td className="p-4 text-center font-black text-blue-600 font-mono text-xs">
     {(d.score).toFixed(3)}
   </td>
@@ -517,7 +559,7 @@ const formatted = jsonAlgo.map((d, i) => ({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="p-12 text-center text-slate-400 italic font-sans bg-slate-50/30">
+                    <td colSpan="9" className="p-12 text-center text-slate-400 italic font-sans bg-slate-50/30">
                       Matriks pengujian kosong. Silakan jalankan simulasi model pada menu Eksekusi Algoritma terlebih dahulu.
                     </td>
                   </tr>

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { clearSession, getSessionUser } from "../lib/session";
 import {
   LayoutDashboard, Database, Activity, BarChart3,
-  Settings, LogOut, ChevronLeft, ShieldCheck
+  LogOut, ChevronLeft
 } from "lucide-react";
 
 const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
@@ -35,12 +35,7 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
     },
   ];
 
-  const menuItems = allMenuItems.filter(item => {
-    if (item.id === 'settings') {
-      return user?.role === 'admin';
-    }
-    return true;
-  });
+  const menuItems = allMenuItems;
 
   const handleLogout = () => {
     clearSession();
@@ -49,33 +44,26 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
   };
 
   return (
+    <>
+      {isOpen && <button aria-label="Tutup menu" className="fixed inset-0 z-40 bg-slate-900/30 md:hidden" onClick={toggleSidebar} />}
     <aside
       className={`
-        ${isOpen ? "w-64" : "w-20"} 
+        ${isOpen ? "w-64 max-w-[calc(100vw-1rem)] translate-x-0" : "w-64 -translate-x-full md:w-20 md:translate-x-0"}
         bg-white border-r border-slate-200/60 transition-all duration-500 
-        flex flex-col fixed h-full z-50 shadow-[4px_0_24px_-10px_rgba(0,0,0,0.05)]
+        flex flex-col fixed h-full overflow-y-auto z-50 shadow-[4px_0_24px_-10px_rgba(0,0,0,0.05)]
       `}
     >
       {/* --- LOGO SECTION --- */}
-      <div className={`h-20 flex items-center ${isOpen ? "px-6 justify-between" : "justify-center"}`}>
+      <div className={`h-16 sm:h-20 flex items-center ${isOpen ? "px-4 sm:px-6 justify-between" : "justify-center"}`}>
         {isOpen ? (
           <div className="flex items-center gap-2.5 animate-in fade-in slide-in-from-left-2 duration-500">
-            <div className="w-9 h-9 bg-[#336B87] rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-900/20">
-              <ShieldCheck size={20} strokeWidth={2.5} />
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-[10px] font-black text-[#336B87] tracking-[0.2em] uppercase leading-none">
-                Pipe
-              </h1>
-              <h1 className="text-lg font-black text-slate-800 tracking-tighter uppercase leading-none mt-1">
-                Analytica
-              </h1>
-            </div>
+            <img src="/logo-pipeline.png" alt="Pipeline Analytica" className="w-10 h-10 object-contain" />
+            <h1 className="text-base font-black text-slate-800 tracking-tight leading-none">
+              Pipeline Analytica
+            </h1>
           </div>
         ) : (
-          <div className="w-12 h-12 bg-[#336B87]/5 rounded-xl flex items-center justify-center text-[#336B87] hover:bg-[#336B87] hover:text-white transition-all duration-300 cursor-pointer shadow-sm">
-            <ShieldCheck size={24} />
-          </div>
+          <img src="/logo-pipeline.png" alt="Pipeline Analytica" className="w-11 h-11 object-contain" />
         )}
       </div>
 
@@ -88,6 +76,7 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
               key={item.id}
               onClick={() => {
                 navigate(`/${item.id}`);
+                if (window.innerWidth < 768) toggleSidebar();
               }}
               className={`
                 flex items-center gap-3.5 w-full px-3.5 py-3 rounded-xl 
@@ -153,6 +142,7 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
         </button>
       </div>
     </aside>
+    </>
   );
 };
 

@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   AlertTriangle,
-  ShieldAlert,
-  Zap,
-  TrendingDown,
   Activity,
   RefreshCw,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -18,6 +15,7 @@ import {
   FileText,
   History,
   Layers,
+  Info,
 } from "lucide-react";
 import {
   getLatestMonitoring,
@@ -36,6 +34,7 @@ import SparklineChart from "../components/SparklineChart";
 import AlertBanner from "../components/AlertBanner";
 import ThresholdGauge from "../components/ThresholdGauge";
 import QuickFilterCards from "../components/QuickFilterCards";
+import { getAppSettings } from "../lib/appSettings";
 
 // ==================== LIBRARY PDF ====================
 // CATATAN OPTIMASI: jsPDF & jspdf-autotable TIDAK di-import statis di sini lagi.
@@ -45,67 +44,28 @@ import QuickFilterCards from "../components/QuickFilterCards";
 // Lihat fungsi handleExportPDF di bawah.
 
 // ==================== KONSTANTA ====================
-// ==================== THRESHOLD SET-POINTS (MAOP & Standar Operasi) ====================
-const THRESHOLDS = {
-  pressure:    { min: 0, max: 8.0, safeMax: 4.0, warnMax: 5.5, unit: "Bar" },
-  flow_rate:   { min: 0, max: 15.0, safeMax: 8.0, warnMax: 10.0, unit: "m³/h" },
-  temperature: { min: 0, max: 90.0, safeMax: 55.0, warnMax: 65.0, unit: "°C" },
-  pump_speed:  { min: 0, max: 2000, safeMax: 1400, warnMax: 1600, unit: "RPM" },
+// ==================== SKALA VISUAL DATASET ====================
+// Rentang ini hanya skala visual untuk nilai dataset, bukan MAOP, set point,
+// atau batas aman fasilitas nyata.
+const DISPLAY_RANGES = {
+  pressure: { min: 0, max: 200, unit: "Bar" },
+  flow_rate: { min: 0, max: 100, unit: "m³/h" },
+  temperature: { min: -50, max: 150, unit: "°C" },
+  pump_speed: { min: 0, max: 5000, unit: "RPM" },
 };
 
-/* ================================================================
-   MATRIKS PREDIKSI — Sesuai Kondisi Tabel Aturan Sistem
-   ================================================================ */
+// Status ini menjelaskan keluaran algoritma pada dataset, bukan kondisi fisik
+// atau alarm operasi pipeline.
 const PREDICTION_MATRIX = {
   Normal: {
     badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
     btnClass: "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-600 hover:text-white",
     icon: CheckCircle2,
-    logicRelation: "Sesuai Set Point.",
-    P: { status: "Stabil", trend: "stable", textClass: "text-emerald-600" },
-    Q: { status: "Stabil", trend: "stable", textClass: "text-emerald-600" },
-    T: { status: "Normal", trend: "stable", textClass: "text-emerald-600" },
-    N: { status: "Stabil", trend: "stable", textClass: "text-emerald-600" },
   },
-  Leak: {
-    badge: "bg-orange-50 text-orange-700 border-orange-200",
-    btnClass: "bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-600 hover:text-white",
-    icon: AlertTriangle,
-    logicRelation: "Pompa \"ngebut\" tapi tekanan tekor.",
-    P: { status: "↓↓ Turun", trend: "sharp_down", textClass: "text-red-600 font-black" },
-    Q: { status: "↓ Turun", trend: "down", textClass: "text-orange-600" },
-    T: { status: "Stabil", trend: "stable", textClass: "text-emerald-600" },
-    N: { status: "↑ Naik", trend: "up", textClass: "text-amber-600" },
-  },
-  Blockage: {
+  Anomaly: {
     badge: "bg-amber-50 text-amber-700 border-amber-200",
     btnClass: "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-600 hover:text-white",
-    icon: ShieldAlert,
-    logicRelation: "Kerja keras tapi aliran mampet.",
-    P: { status: "↑↑ Naik", trend: "sharp_up", textClass: "text-red-600 font-black" },
-    Q: { status: "↓↓ Turun", trend: "sharp_down", textClass: "text-red-600 font-black" },
-    T: { status: "↑ Naik", trend: "up", textClass: "text-orange-600" },
-    N: { status: "↑ Naik", trend: "up", textClass: "text-amber-600" },
-  },
-  Surge: {
-    badge: "bg-red-50 text-red-700 border-red-200",
-    btnClass: "bg-red-50 text-red-700 border border-red-200 hover:bg-red-600 hover:text-white",
-    icon: Zap,
-    logicRelation: "Mesin dan aliran \"berantem\".",
-    P: { status: "~ Liar", trend: "chaotic", textClass: "text-red-600 animate-pulse" },
-    Q: { status: "~ Liar", trend: "chaotic", textClass: "text-red-600 animate-pulse" },
-    T: { status: "Stabil", trend: "stable", textClass: "text-emerald-600" },
-    N: { status: "~ Tidak Stabil", trend: "chaotic", textClass: "text-orange-600" },
-  },
-  Degradation: {
-    badge: "bg-purple-50 text-purple-700 border-purple-200",
-    btnClass: "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-600 hover:text-white",
-    icon: TrendingDown,
-    logicRelation: "Efisiensi rendah, boros energi.",
-    P: { status: "↓ Turun", trend: "down", textClass: "text-amber-600" },
-    Q: { status: "↓ Turun", trend: "down", textClass: "text-amber-600" },
-    T: { status: "↑ Naik", trend: "up", textClass: "text-orange-600" },
-    N: { status: "↑↑ Tinggi", trend: "sharp_up", textClass: "text-red-600 font-black" },
+    icon: AlertTriangle,
   },
 };
 
@@ -113,7 +73,7 @@ const PREDICTION_MATRIX = {
 const formatDateTimeID = (dateStr) => {
   try {
     const d = dateStr ? new Date(dateStr) : new Date();
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} WIB — ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} — ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   } catch { return "—"; }
 };
 
@@ -121,12 +81,18 @@ const formatDateLong = (dateStr) => {
   try {
     const d = dateStr ? new Date(dateStr) : new Date();
     const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} — ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} WIB`;
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} — ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
   } catch { return "—"; }
 };
 
-const getCfg = (pred) => PREDICTION_MATRIX[pred] || PREDICTION_MATRIX.Normal;
+const getCfg = (pred) => pred === "Normal" ? PREDICTION_MATRIX.Normal : PREDICTION_MATRIX.Anomaly;
 const fmt = (v) => (isNaN(Number(v)) ? "—" : Number(v).toFixed(1));
+const getPatternLabel = (pattern) => ({
+  leak: "Indikasi Leak",
+  blockage: "Indikasi Blockage",
+  surge: "Indikasi Surge",
+  degradation: "Indikasi Degradation",
+}[String(pattern || "").toLowerCase()] || "Indikasi pola lain");
 
 const mapSeverityToFilter = (severity) => {
   switch (severity) {
@@ -169,9 +135,9 @@ const getNormLabel = (norm) => {
 const createMissingInsight = () => ({
   prediction: "Anomaly",
   severity: "Medium",
-  reason: "Insight dari server tidak tersedia untuk riwayat ini.",
-  impact: "Perlu validasi ulang data monitoring.",
-  solution: "Jalankan analisis ulang untuk memperoleh insight dari server.",
+  reason: "Interpretasi server tidak tersedia untuk riwayat ini.",
+  impact: "Label ini tidak dapat ditafsirkan sebagai diagnosis fisik.",
+  solution: "Jalankan ulang analisis bila interpretasi diperlukan.",
 });
 
 /* ================================================================
@@ -249,6 +215,11 @@ const LogRow = React.memo(function LogRow({ log, isExpanded, onToggle }) {
             >
               {log.severity}
             </span>
+            {log.prediction !== "Normal" && (
+              <span className="text-[9px] font-bold text-slate-500">
+                {getPatternLabel(log.pattern)}
+              </span>
+            )}
           </div>
         </td>
 
@@ -272,56 +243,29 @@ const LogRow = React.memo(function LogRow({ log, isExpanded, onToggle }) {
                 <div className="flex items-center gap-2 mb-3">
                   <Activity size={14} style={{ color: PRIMARY_COLOR }} />
                   <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Indikator Ambang Batas Operasional (MAOP)
+                    Posisi Nilai pada Skala Dataset
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <ThresholdGauge label="Pressure" value={log.pressure} min={THRESHOLDS.pressure.min} max={THRESHOLDS.pressure.max} unit={THRESHOLDS.pressure.unit} setpoints={[THRESHOLDS.pressure.safeMax, THRESHOLDS.pressure.warnMax]} />
-                  <ThresholdGauge label="Flow Rate" value={log.flow_rate} min={THRESHOLDS.flow_rate.min} max={THRESHOLDS.flow_rate.max} unit={THRESHOLDS.flow_rate.unit} setpoints={[THRESHOLDS.flow_rate.safeMax, THRESHOLDS.flow_rate.warnMax]} />
-                  <ThresholdGauge label="Temperature" value={log.temperature} min={THRESHOLDS.temperature.min} max={THRESHOLDS.temperature.max} unit={THRESHOLDS.temperature.unit} setpoints={[THRESHOLDS.temperature.safeMax, THRESHOLDS.temperature.warnMax]} />
-                  <ThresholdGauge label="Pump Speed" value={log.pump_speed} min={THRESHOLDS.pump_speed.min} max={THRESHOLDS.pump_speed.max} unit={THRESHOLDS.pump_speed.unit} setpoints={[THRESHOLDS.pump_speed.safeMax, THRESHOLDS.pump_speed.warnMax]} />
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={14} style={{ color: PRIMARY_COLOR }} />
-                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Korelasi Aturan Logika Matriks
-                  </span>
-                </div>
-                <p className="text-xs font-extrabold text-slate-800 mb-2">
-                  Hubungan Logika: <span className="italic">"{cfg.logicRelation}"</span>
-                </p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                  <div className="bg-white p-2 rounded border border-gray-100">
-                    Pressure (P): <span className={cfg.P.textClass}>{cfg.P.status}</span>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-gray-100">
-                    Flow (Q): <span className={cfg.Q.textClass}>{cfg.Q.status}</span>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-gray-100">
-                    Temp (T): <span className={cfg.T.textClass}>{cfg.T.status}</span>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-gray-100">
-                    Pump Speed (N): <span className={cfg.N.textClass}>{cfg.N.status}</span>
-                  </div>
+                  <ThresholdGauge label="Pressure" value={log.pressure} {...DISPLAY_RANGES.pressure} />
+                  <ThresholdGauge label="Flow Rate" value={log.flow_rate} {...DISPLAY_RANGES.flow_rate} />
+                  <ThresholdGauge label="Temperature" value={log.temperature} {...DISPLAY_RANGES.temperature} />
+                  <ThresholdGauge label="Pump Speed" value={log.pump_speed} {...DISPLAY_RANGES.pump_speed} />
                 </div>
               </div>
 
               {log.insight && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] leading-relaxed">
                   <div className="p-2.5 bg-red-50/50 text-slate-700 rounded-lg border border-red-100">
-                    <strong className="text-red-700 block text-[10px] uppercase font-black mb-0.5">Penyebab Otomatis</strong>
+                    <strong className="text-red-700 block text-[10px] uppercase font-black mb-0.5">Ciri Pola Teramati</strong>
                     {log.insight.reason}
                   </div>
                   <div className="p-2.5 bg-amber-50/50 text-slate-700 rounded-lg border border-amber-100">
-                    <strong className="text-amber-700 block text-[10px] uppercase font-black mb-0.5">Dampak Sistem</strong>
+                    <strong className="text-amber-700 block text-[10px] uppercase font-black mb-0.5">Kemungkinan Makna / Batas</strong>
                     {log.insight.impact}
                   </div>
                   <div className="p-2.5 bg-emerald-50/50 text-slate-700 rounded-lg border border-emerald-100">
-                    <strong className="text-emerald-700 block text-[10px] uppercase font-black mb-0.5">Solusi Direkomendasikan</strong>
+                    <strong className="text-emerald-700 block text-[10px] uppercase font-black mb-0.5">Validasi yang Disarankan</strong>
                     {log.insight.solution}
                   </div>
                 </div>
@@ -334,10 +278,72 @@ const LogRow = React.memo(function LogRow({ log, isExpanded, onToggle }) {
   );
 });
 
+const MobileLogCard = React.memo(function MobileLogCard({ log, isExpanded, onToggle }) {
+  const cfg = getCfg(log.prediction);
+  const metrics = [
+    ["Pressure", fmt(log.pressure), "Bar", "text-slate-800"],
+    ["Flow Rate", fmt(log.flow_rate), "m³/h", "text-cyan-700"],
+    ["Temperature", fmt(log.temperature), "°C", "text-rose-600"],
+    ["Pump Speed", Math.round(log.pump_speed), "RPM", "text-purple-600"],
+  ];
+
+  return (
+    <article className={`rounded-xl border p-3 shadow-sm ${isExpanded ? "border-[#336B87]/40 bg-slate-50/60" : "border-slate-200 bg-white"}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold text-slate-400">{formatDateTimeID(log.timestamp)}</p>
+          <p className="mt-0.5 text-xs font-black text-slate-700">Segmen {log.segment_id || "—"}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black ${cfg.badge}`}>
+            <cfg.icon size={10} /> {log.prediction.toUpperCase()}
+          </span>
+          {log.prediction !== "Normal" && <p className="mt-1 text-[9px] font-bold text-slate-500">{getPatternLabel(log.pattern)}</p>}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {metrics.map(([label, value, unit, color]) => (
+          <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+            <p className={`mt-0.5 text-sm font-black tabular-nums ${color}`}>{value} <span className="text-[9px] font-semibold text-slate-400">{unit}</span></p>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => onToggle(log.id)}
+        className={`mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg px-3 py-2 text-[11px] font-black transition-colors ${cfg.btnClass}`}
+      >
+        {isExpanded ? "Tutup Detail" : "Detail Analisis"}
+        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+      </button>
+
+      {isExpanded && (
+        <div className="mt-3 space-y-2 border-t border-dashed border-slate-200 pt-3 text-[11px] leading-relaxed">
+          <div className="rounded-lg border border-red-100 bg-red-50/60 p-2.5 text-slate-700">
+            <strong className="block text-[10px] font-black uppercase text-red-700">Ciri Pola Teramati</strong>
+            {log.insight.reason}
+          </div>
+          <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-2.5 text-slate-700">
+            <strong className="block text-[10px] font-black uppercase text-amber-700">Kemungkinan Makna / Batas</strong>
+            {log.insight.impact}
+          </div>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5 text-slate-700">
+            <strong className="block text-[10px] font-black uppercase text-emerald-700">Validasi yang Disarankan</strong>
+            {log.insight.solution}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+});
+
 /* ================================================================
    MAIN COMPONENT: Monitoring
    ================================================================ */
 export default function Monitoring() {
+  const [searchParams] = useSearchParams();
   const [allLogs, setAllLogs] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -347,6 +353,7 @@ export default function Monitoring() {
   const [selectedSeverity, setSelectedSeverity] = useState("all");
   const [searchSegmentId, setSearchSegmentId] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [showReadingGuide, setShowReadingGuide] = useState(false);
 
   // --- FITUR: DROPDOWN RIWAYAT EKSEKUSI ---
   const [historyList, setHistoryList] = useState([]);
@@ -410,6 +417,7 @@ export default function Monitoring() {
       temperature: Number(item.temperature || 0),
       pump_speed: Number(item.pump_speed || 0),
       prediction: item.prediction || "Normal",
+      pattern: item.pattern || item.type || "normal",
       severity: severity || "Medium",
       severityCategory: mapSeverityToFilter(severity || "Medium"),
       insight: item.insight || {
@@ -426,22 +434,16 @@ export default function Monitoring() {
       let responseData, responseMeta;
 
       if (selectedRunId === null) {
-        // Mode Live — gunakan endpoint /api/monitoring (sudah ada insight)
+        // Menampilkan hasil eksekusi tersimpan paling baru, bukan aliran SCADA real-time.
         const result = await fetchLatestMonitoring();
         responseData = result.responseData;
         responseMeta = result.responseMeta;
 
         if (responseMeta) setMeta(responseMeta);
 
-        // OPTIMASI: bersihkan buffer sparkline dari segment_id yang sudah
-        // tidak ada di data terbaru, supaya Map tidak membengkak tanpa
-        // batas selama aplikasi berjalan lama (penting untuk RAM 4GB).
-        const activeSegIds = new Set(responseData.map((it, i) => it.segment_id || `seg-${i}`));
-        for (const key of historyBuffer.current.keys()) {
-          if (!activeSegIds.has(key)) historyBuffer.current.delete(key);
-        }
-
-        const logs = responseData.map((item, idx) => {
+        historyBuffer.current.clear();
+        const chronologicalData = [...responseData].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const logs = chronologicalData.map((item, idx) => {
           const segId = item.segment_id || `seg-${idx}`;
           return buildLogEntry(item, segId, idx, item.severity || "Medium");
         });
@@ -461,6 +463,10 @@ export default function Monitoring() {
           metrics: {
             silhouette: run.silhouette,
             davies_bouldin: run.davies_bouldin,
+            accuracy: run.accuracy,
+            precision: run.precision,
+            recall: run.recall,
+            f1_score: run.f1_score,
           },
           summary: {
             total_anomaly: run.anomaly,
@@ -475,11 +481,13 @@ export default function Monitoring() {
           ...normalDetails.map((item) => ({ ...item, _type: "normal" })),
         ];
 
-        const logs = allItems.map((item, idx) => {
+        historyBuffer.current.clear();
+        const chronologicalItems = allItems.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const logs = chronologicalItems.map((item, idx) => {
           const segId = item.segment_id || `seg-${idx}`;
           const insight = item.insight
             ? {
-                prediction: item.prediction,
+                prediction: item._type === "normal" ? "Normal" : "Anomaly",
                 severity: item.severity,
                 ...item.insight,
               }
@@ -487,8 +495,9 @@ export default function Monitoring() {
           return buildLogEntry(
             {
               ...item,
-              prediction: insight.prediction,
-              severity: insight.severity,
+              prediction: item._type === "normal" ? "Normal" : "Anomaly",
+              pattern: item._type === "normal" ? "normal" : item.type,
+              severity: item._type === "normal" ? "Safe" : "Medium",
               insight: {
                 reason: insight.reason,
                 impact: insight.impact,
@@ -497,7 +506,7 @@ export default function Monitoring() {
             },
             segId,
             idx,
-            insight.severity
+            item._type === "normal" ? "Safe" : "Medium"
           );
         });
         setAllLogs(logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
@@ -521,7 +530,7 @@ export default function Monitoring() {
 
   // Auto-refresh HANYA untuk mode Live (selectedRunId === null)
   useEffect(() => {
-    if (selectedRunId !== null) return;
+    if (selectedRunId !== null || !getAppSettings().autoRefresh) return;
     const iv = setInterval(fetchData, REFRESH_INTERVAL);
     return () => clearInterval(iv);
   }, [fetchData, selectedRunId]);
@@ -531,6 +540,10 @@ export default function Monitoring() {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedPred, selectedSeverity, searchSegmentId, selectedRunId]);
+
+  useEffect(() => {
+    setSelectedPred(searchParams.get("status") === "Anomaly" ? "Anomaly" : "all");
+  }, [searchParams]);
 
   const toggleExpandLog = useCallback((id) => {
     setExpandedLogId((prev) => (prev === id ? null : id));
@@ -566,6 +579,24 @@ export default function Monitoring() {
     const normal = allLogs.filter((l) => l.prediction === "Normal").length;
     return { total, anomaly, normal };
   }, [allLogs]);
+
+  const executionSummary = useMemo(() => {
+    const anomalyRate = stats.total ? (stats.anomaly / stats.total) * 100 : 0;
+    const hasAnomaly = stats.anomaly > 0;
+
+    return {
+      anomalyRate,
+      title: hasAnomaly ? "Observasi anomali perlu ditinjau" : "Tidak ada observasi anomali",
+      description: hasAnomaly
+        ? `${stats.anomaly} dari ${stats.total} observasi (${anomalyRate.toFixed(1)}%) berbeda dari pola yang dipelajari model.`
+        : "Seluruh observasi pada eksekusi ini tidak ditandai anomali oleh model.",
+      className: hasAnomaly
+        ? "border-amber-200 bg-amber-50 text-amber-900"
+        : "border-emerald-200 bg-emerald-50 text-emerald-900",
+      iconClassName: hasAnomaly ? "text-amber-600" : "text-emerald-600",
+      Icon: hasAnomaly ? AlertTriangle : CheckCircle2,
+    };
+  }, [stats]);
 
   // ==================== EXPORT PDF (LAZY-LOADED) ====================
   const handleExportPDF = useCallback(async () => {
@@ -670,7 +701,7 @@ export default function Monitoring() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 font-sans text-slate-600">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 font-sans text-slate-600">
       <div className="max-w-[1600px] mx-auto space-y-3">
 
         {/* ================================================================
@@ -679,7 +710,7 @@ export default function Monitoring() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h1 className="text-base font-black text-slate-800 flex items-center gap-1.5">
-               
+              Monitoring Hasil Deteksi Anomali
             </h1>
             <p className="text-[11px] text-slate-400 font-semibold mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>Total Data: <span className="text-slate-700 font-bold">{stats.total} entries</span></span>
@@ -706,26 +737,32 @@ export default function Monitoring() {
               )}
             </p>
           </div>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <select
-              value={selectedPred}
-              onChange={(e) => setSelectedPred(e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-lg p-1.5 text-xs font-bold text-slate-600 focus:outline-none"
-            >
-              <option value="all">Semua Status</option>
-              {["Normal", "Leak", "Blockage", "Surge", "Degradation"].map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+        <div className={`rounded-xl border p-4 ${executionSummary.className}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <executionSummary.Icon size={20} className={`mt-0.5 shrink-0 ${executionSummary.iconClassName}`} />
+              <div>
+                <p className="text-sm font-black">{executionSummary.title}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed">{executionSummary.description}</p>
+              </div>
+            </div>
             <button
-              onClick={fetchData}
-              disabled={historyLoading}
-              className="p-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 transition-colors disabled:opacity-50"
+              onClick={() => setShowReadingGuide((show) => !show)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-current/20 bg-white/70 px-3 py-2 text-xs font-bold hover:bg-white"
             >
-              <RefreshCw size={14} className={historyLoading ? "animate-spin" : ""} />
+              <Info size={13} /> {showReadingGuide ? "Sembunyikan cara baca" : "Cara membaca hasil"}
             </button>
           </div>
+
+          {showReadingGuide && (
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 border-t border-current/10 pt-3 text-[11px] leading-relaxed">
+              <p><strong>1. Nilai sensor:</strong> pressure, flow rate, temperature, dan pump speed ditampilkan dalam satuan asli.</p>
+              <p><strong>2. Status model:</strong> “Normal” berarti tidak ditandai; “Anomaly” berarti polanya berbeda menurut konfigurasi algoritma yang dipilih.</p>
+              <p><strong>3. Tindak lanjut:</strong> buka detail observasi untuk meninjau nilai dan konteksnya. Status ini bukan diagnosis fisik atau alarm real-time.</p>
+            </div>
+          )}
         </div>
 
         {/* ================================================================
@@ -750,7 +787,7 @@ export default function Monitoring() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <div className="relative">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
                 <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
                   <History size={12} className="text-slate-400" />
                   <select
@@ -761,7 +798,7 @@ export default function Monitoring() {
                     }}
                     className="bg-transparent text-xs font-bold text-slate-600 focus:outline-none min-w-[220px]"
                   >
-                    <option value="">Live Data Terbaru</option>
+                    <option value="">Hasil Eksekusi Terbaru</option>
                     {historyList.map((run) => (
                       <option key={run.id} value={run.id}>
                         [ID {run.id}] {run.algorithm?.toUpperCase() || "?"} + {getNormLabel(run.normalization)} {formatDateTimeID(run.created_at)}
@@ -792,7 +829,7 @@ export default function Monitoring() {
                 onClick={() => setSelectedRunId(null)}
                 className="text-blue-600 hover:underline font-bold"
               >
-                Kembali ke Live
+                Kembali ke hasil terbaru
               </button>
             </p>
           )}
@@ -802,8 +839,23 @@ export default function Monitoring() {
             IV. TABEL PREDIKSI UTAMA (DENGAN SPARKLINE, PAGINATED)
             ================================================================ */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="space-y-2 p-3 sm:hidden">
+            {paginatedLogs.length === 0 ? (
+              <div className="py-8 text-center text-xs font-bold text-slate-400">
+                Tidak ada log data yang tersedia.
+              </div>
+            ) : paginatedLogs.map((log) => (
+              <MobileLogCard
+                key={log.id}
+                log={log}
+                isExpanded={expandedLogId === log.id}
+                onToggle={toggleExpandLog}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="min-w-[980px] w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-gray-100 text-slate-400 font-black uppercase tracking-wider">
                   <th className="py-3 px-4">Waktu / Segmen</th>
@@ -895,14 +947,12 @@ export default function Monitoring() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
-                { label: "Silhouette", val: meta.metrics.silhouette, color: "text-indigo-600", bg: "bg-indigo-50", note: "Semakin tinggi semakin baik (max .+1)" },
-                { label: "Davies-Bouldin", val: meta.metrics.davies_bouldin, color: "text-purple-600", bg: "bg-purple-50", note: "Semakin rendah semakin baik (min. 0)" },
-                {label: "Davies-Bouldin",
-        val: meta.metrics.davies_bouldin,
-        color: "text-purple-600",
-        bg: "bg-purple-50",
-        note: "Semakin rendah semakin baik (min. 0)"
-    },
+                { label: "Silhouette", val: meta.metrics.silhouette, color: "text-indigo-600", bg: "bg-indigo-50", note: "Metrik struktur internal", decimal: true },
+                { label: "Davies-Bouldin", val: meta.metrics.davies_bouldin, color: "text-purple-600", bg: "bg-purple-50", note: "Metrik struktur internal", decimal: true },
+                { label: "Accuracy", val: meta.metrics.accuracy, color: "text-blue-600", bg: "bg-blue-50", note: "Terhadap target dataset", decimal: true },
+                { label: "Precision", val: meta.metrics.precision, color: "text-cyan-600", bg: "bg-cyan-50", note: "Terhadap target dataset", decimal: true },
+                { label: "Recall", val: meta.metrics.recall, color: "text-amber-600", bg: "bg-amber-50", note: "Terhadap target dataset", decimal: true },
+                { label: "F1 Score", val: meta.metrics.f1_score, color: "text-rose-600", bg: "bg-rose-50", note: "Terhadap target dataset", decimal: true },
     {
         label: "Total Klaster",
         val: meta.cluster,
@@ -936,9 +986,7 @@ export default function Monitoring() {
         <p className="text-[10px] font-bold text-slate-400 uppercase">{m.label}</p>
         <p className={`text-base font-black ${m.color} tabular-nums`}>
             {m.val != null
-                ? (m.label === "Silhouette Score" || m.label === "Davies-Bouldin")
-                    ? Number(m.val).toFixed(3)
-                    : m.val
+                ? m.decimal ? Number(m.val).toFixed(3) : m.val
                 : "—"
             }
         </p>

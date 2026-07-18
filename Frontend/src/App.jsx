@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Routes,
   Route,
@@ -16,8 +16,8 @@ import DataManagement from "./pages/DataManagement";
 import AlgorithmExecution from "./pages/AlgorithmExecution";
 import Monitoring from "./pages/Monitoring";
 import Settings from "./pages/Settings";
-import Security from "./pages/Security";
 import MyProfile from "./pages/MyProfile";
+import { applyTheme, getAppSettings } from "./lib/appSettings";
 
 function App() {
 
@@ -29,6 +29,10 @@ function App() {
 
   const location = useLocation();
   const activePage = location.pathname.slice(1) || "overview";
+
+  useEffect(() => {
+    applyTheme(getAppSettings().darkMode);
+  }, []);
 
   /* =========================
      PROTECTED ROUTE
@@ -63,7 +67,7 @@ function App() {
 
   return (
 
-    <div className="flex bg-[#f8fafc] min-h-screen w-full overflow-x-hidden font-sans text-slate-900">
+    <div className="flex min-h-screen w-full overflow-x-hidden bg-[#f8fafc] font-sans text-slate-900">
 
       {/* SIDEBAR */}
 
@@ -80,18 +84,19 @@ function App() {
 
       <main
         className={`
-          flex-1 min-h-screen transition-all duration-500
-          ${isSidebarOpen ? "pl-64" : "pl-20"}
+          min-w-0 flex-1 min-h-screen transition-all duration-500
+          pl-0 ${isSidebarOpen ? "md:pl-64" : "md:pl-20"}
         `}
       >
 
-        <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+        <div className="w-full max-w-[1600px] p-0 sm:p-4 md:p-8 mx-auto">
 
           {/* HEADER */}
 
           <Header
             activePage={activePage}
             onLogin={setIsAuthenticated}
+            onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
           />
 
           {/* PAGE CONTENT */}
@@ -127,7 +132,7 @@ function App() {
 
               <Route
                 path="/security"
-                element={<Security />}
+                element={<Navigate to="/settings" replace />}
               />
 
               <Route

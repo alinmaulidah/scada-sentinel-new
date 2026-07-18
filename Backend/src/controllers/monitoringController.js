@@ -22,6 +22,7 @@ const formatLog = (item, isNormalFromAlgorithm) => {
     pump_speed: item.pump_speed,
     prediction: insight.prediction,
     severity: insight.severity,
+    pattern: insight.pattern,
     insight: {
       reason: insight.reason,
       impact: insight.impact,

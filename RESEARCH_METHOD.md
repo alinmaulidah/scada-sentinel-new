@@ -10,11 +10,9 @@ Sebanyak 1.000 observasi dengan empat fitur analisis dapat diproses pada RAM 4 G
 
 ## Prapemrosesan dan integritas data
 
-Pada file kerja lama `500.xlsx` ditemukan 208 sel sensor yang disimpan Excel sebagai serial tanggal: 106 pada `flow_rate`, 34 pada `temperature`, dan 68 pada `energy_consumption`. Nilai yang terlihat di Excel adalah nilai yang diimpor; serial tanggal internal tidak boleh digunakan sebagai nilai sensor. File sumber `dataset-pipeline.xlsx` dan sampel final `scada_stratified_500_seed42.xlsx` tidak memiliki masalah format tersebut.
+Saat audit ditemukan 208 sel sensor yang disimpan Excel sebagai serial tanggal: 106 pada `flow_rate`, 34 pada `temperature`, dan 68 pada `energy_consumption`. Nilai yang terlihat di Excel adalah nilai yang diimpor; serial tanggal internal tidak boleh digunakan sebagai nilai sensor. Proses ini harus dicatat pada Bab III sebagai pemulihan format Excel, bukan sebagai perubahan nilai dari sumber Kaggle.
 
 Backend juga menolak nilai di luar rentang valid untuk dataset ini dan status yang tidak sesuai. File mentah harus disimpan terpisah dari data kerja yang diimpor. Laporkan jumlah baris sebelum dan sesudah validasi pada setiap eksperimen.
-
-Sistem menerapkan **satu dataset aktif**: impor ditolak bila tabel `sensor_logs` masih berisi data. Sebelum mengganti dataset, pengguna harus mengosongkan data aktif. Tindakan tersebut sekaligus menghapus seluruh `algorithm_results`, karena riwayat hasil belum menyimpan versi atau salinan dataset sumber. Mekanisme ini mencegah hasil lama ditampilkan untuk dataset baru dan mencegah impor ganda.
 
 ## Protokol eksperimen
 
@@ -28,60 +26,8 @@ Kolom `target` tidak digunakan untuk fitting, pemilihan ambang, atau penentuan a
 
 Untuk setiap konfigurasi, laporkan jumlah data, jumlah anomali, parameter model, Silhouette Score, Davies-Bouldin Index, confusion matrix, accuracy, precision, recall, dan F1-score. Nyatakan bahwa metrik eksternal saat ini dihitung pada dataset berlabel yang sama; metrik tersebut bukan klaim performa out-of-sample.
 
-Dataset sumber memiliki 694 label normal dan 306 label anomali. Sampel 500 data memiliki 347 label normal dan 153 label anomali. Karena `event_type=normal` selalu berpasangan dengan `target=0` dan empat event lain berpasangan dengan `target=1`, jelaskan asal dan arti label Kaggle tersebut. Jangan menyebut sistem sebagai SCADA real-time atau diagnosis kerusakan pasti; istilah yang tepat adalah analisis anomali pada dataset SCADA publik.
+Dataset ini memiliki 330 label normal dan 169 label anomali. Karena `event_type=normal` selalu berpasangan dengan `target=0` dan empat event lain berpasangan dengan `target=1`, jelaskan asal dan arti label Kaggle tersebut. Jangan menyebut sistem sebagai SCADA real-time atau diagnosis kerusakan pasti; istilah yang tepat adalah analisis anomali pada dataset SCADA publik.
 
 ## Batasan
 
-Dataset publik dan labelnya tidak dapat dianggap sebagai bukti kondisi operasi pipeline nyata. Oleh sebab itu, penelitian ini menunjukkan evaluasi eksperimental pada dataset SCADA publik, bukan generalisasi ke operasi pipeline nyata. Untuk klaim generalisasi, diperlukan dataset waktu yang lebih panjang atau dataset lain yang benar-benar dipisahkan sebagai data uji.
-
-## Alur sistem untuk Bab III
-
-1. Pengguna masuk ke sistem, membuka **Data Management**, lalu mengimpor `dataset-pipeline.xlsx` atau `scada_stratified_500_seed42.xlsx`.
-2. Frontend membaca nilai yang terlihat pada Excel. Jika sebuah kolom sensor berformat tanggal Excel, sistem memberi peringatan agar serial tanggal internal tidak masuk sebagai nilai sensor.
-3. Backend memvalidasi timestamp, status biner, kelengkapan data, dan rentang nilai sensor sebelum data disimpan ke tabel `sensor_logs`.
-4. Pada halaman **Eksekusi Algoritma**, pengguna memilih K-Means atau DBSCAN serta Min-Max atau Z-Score. Normalisasi dilakukan hanya saat eksekusi model, bukan saat impor, sehingga data sumber di database tetap dalam satuan aslinya.
-5. Hasil eksekusi disimpan sebagai riwayat, kemudian ditampilkan pada halaman **Monitoring** dan **Dashboard**.
-6. Halaman Monitoring mengambil hasil eksekusi tersimpan paling baru atau satu riwayat yang dipilih. Urutan sparkline dibangun dari timestamp menaik, lalu tabel ditampilkan menurun agar observasi terbaru berada di atas.
-
-Normalisasi Min-Max mengubah setiap fitur ke rentang 0 hingga 1. Z-Score memusatkan data pada rata-rata 0 dengan simpangan baku 1. Kedua metode dibandingkan karena algoritma berbasis jarak peka terhadap perbedaan skala pressure, flow rate, temperature, dan pump speed.
-
-## Catatan tampilan Monitoring dan akses mobile
-
-Monitoring adalah visualisasi **hasil eksekusi historis**, bukan integrasi aliran SCADA real-time. Label "Anomaly" berarti observasi ditandai oleh algoritma; label "Normal" berarti tidak ditandai pada konfigurasi tersebut. Keduanya bukan diagnosis fisik kebocoran, sumbatan, surge, maupun pernyataan bahwa pipeline aman.
-
-Batang empat sensor pada detail observasi memakai rentang validasi dataset hanya sebagai skala visual. Batang tersebut bukan MAOP, set point, alarm, atau standar keselamatan. Teks tindak lanjut dibatasi pada peninjauan record dan validasi penelitian; sistem tidak memberi instruksi operasi lapangan.
-
-Antarmuka menggunakan sidebar yang menjadi menu overlay pada layar kecil, tombol menu pada header, padding konten responsif, kartu/grid yang dapat menyusut, dan tabel dengan gulir horizontal. Dengan demikian fungsi utama tetap dapat diakses pada mobile tanpa memaksakan tabel lebar menjadi kolom sempit.
-
-## Interpretasi hasil model untuk Bab IV
-
-### K-Means
-
-K-Means mengelompokkan observasi berdasarkan kedekatan pada empat fitur yang telah dinormalisasi. Nomor `Kluster 1`, `Kluster 2`, dan seterusnya hanya label internal; nomor tersebut tidak bermakna normal atau anomali, dan bukan `segment_id` tertentu.
-
-Centroid adalah titik pusat matematis sebuah cluster, bukan satu baris sensor nyata. Panel centroid menampilkan pressure, flow rate, temperature, dan pump speed dalam satuan asli setelah hasil centroid dikembalikan dari skala normalisasi. Perbedaan antar-cluster dapat disebabkan oleh satu atau beberapa dari empat fitur; kesimpulan tidak boleh dibuat hanya dari pressure atau flow rate.
-
-Untuk K-Means, sebuah observasi ditandai anomali bila jaraknya ke centroid terdekat lebih besar daripada ambang robust `median + 3*MAD`. Nilai ambang adalah jarak Euclidean pada ruang empat dimensi yang telah dinormalisasi, sehingga bukan satuan bar, m3/h, derajat Celsius, atau rpm. Nilai tersebut tidak boleh ditafsirkan sebagai batas fisik operasional pipeline.
-
-### DBSCAN
-
-DBSCAN membentuk cluster berdasarkan kepadatan titik. Titik dengan label noise (`-1`) ditandai sebagai anomali. Parameter `eps` ditentukan dari k-distance dan `min_samples` ditetapkan 5 sesuai jumlah fitur (4) ditambah satu. Bila DBSCAN hanya menghasilkan satu cluster non-noise, Silhouette dan Davies-Bouldin tidak boleh dipakai untuk menyatakan kualitas pemisahan cluster.
-
-### Metrik dan cara menulis kesimpulan
-
-Silhouette Score dan Davies-Bouldin Index adalah metrik struktur internal cluster. Silhouette lebih tinggi dan Davies-Bouldin lebih rendah menunjukkan struktur cluster yang lebih baik, tetapi keduanya **bukan** accuracy. Accuracy, precision, recall, dan F1-score dihitung setelah model selesai menggunakan kolom `target` sebagai pembanding eksternal.
-
-Gunakan kalimat seperti: “Pada konfigurasi [algoritma] dengan [normalisasi], struktur internal cluster memperoleh Silhouette Score [nilai] dan Davies-Bouldin Index [nilai]. Berdasarkan label `target` pada dataset publik, konfigurasi tersebut memperoleh precision [nilai], recall [nilai], dan F1-score [nilai].” Hindari kalimat “sistem terbukti aman”, “kerusakan pasti terdeteksi”, atau “model paling akurat” bila pemilihan model hanya memakai Silhouette Score.
-
-## Template hasil Bab IV
-
-Isi tabel berikut setelah empat eksekusi selesai. Jangan mengisi nilai yang belum dihasilkan sistem.
-
-| Algoritma | Normalisasi | Parameter utama | Jumlah anomali | Silhouette | Davies-Bouldin | Accuracy | Precision | Recall | F1 |
-|---|---|---|---:|---:|---:|---:|---:|---:|---:|
-| K-Means | Min-Max | k = ...; threshold = ... | ... | ... | ... | ... | ... | ... | ... |
-| K-Means | Z-Score | k = ...; threshold = ... | ... | ... | ... | ... | ... | ... | ... |
-| DBSCAN | Min-Max | eps = ...; min_samples = 5 | ... | ... | ... | ... | ... | ... | ... |
-| DBSCAN | Z-Score | eps = ...; min_samples = 5 | ... | ... | ... | ... | ... | ... | ... |
-
-Lampirkan tangkapan layar konfigurasi, panel centroid K-Means, tabel anomali, dan hasil monitoring. Gunakan Dashboard hanya sebagai ringkasan visual; tabel metrik lengkap pada Monitoring atau tabel Bab IV tetap menjadi rujukan utama.
+Dataset hanya mencakup 9 timestamp dalam rentang sekitar delapan menit dan memiliki kombinasi timestamp-segment yang berulang. Oleh sebab itu, penelitian ini menunjukkan evaluasi eksperimental pada dataset publik, bukan generalisasi ke operasi pipeline nyata. Untuk klaim generalisasi, diperlukan dataset waktu yang lebih panjang atau dataset Kaggle lain yang benar-benar dipisahkan sebagai data uji.

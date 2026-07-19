@@ -15,7 +15,6 @@ import {
   FileText,
   History,
   Layers,
-  Info,
 } from "lucide-react";
 import {
   getLatestMonitoring,
@@ -52,6 +51,67 @@ const DISPLAY_RANGES = {
   flow_rate: { min: 0, max: 100, unit: "m³/h" },
   temperature: { min: -50, max: 150, unit: "°C" },
   pump_speed: { min: 0, max: 5000, unit: "RPM" },
+};
+
+// Ringkasan aturan yang sama dengan interpretasi backend. Ini membantu
+// presentasi hasil tanpa mengubah label atau ambang klasifikasi model.
+const PATTERN_GUIDE = {
+  surge: {
+    label: "Surge",
+    pressure: "Pressure naik",
+    flow: "Flow rate naik",
+    rule: "P dan Q berada di atas median + 1,5 IQR pada eksekusi ini.",
+    summary: "Pressure dan flow rate sama-sama meningkat dibanding pola tengah data.",
+    meaning: "Kenaikan serentak ini konsisten dengan surge-like, tetapi belum membuktikan osilasi tekanan tanpa data waktu kontinu.",
+    impact: "Perubahan pressure yang cepat dapat mengganggu kestabilan operasi dan perlu ditinjau sebelum membebani peralatan.",
+    priority: "Tinggi — verifikasi segera",
+    priorityClass: "bg-red-100 text-red-700",
+    action: "Bandingkan dengan observasi sebelum dan sesudahnya.",
+    className: "border-violet-200 bg-violet-50 text-violet-900",
+    chipClass: "bg-violet-100 text-violet-700",
+  },
+  leak: {
+    label: "Leak",
+    pressure: "Pressure turun",
+    flow: "Flow rate turun",
+    rule: "P < median − 1 IQR dan Q < median − 0,5 IQR pada eksekusi ini.",
+    summary: "Pressure dan flow rate sama-sama menurun dibanding pola tengah data.",
+    meaning: "Pola ini konsisten dengan leak-like, bukan bukti kebocoran fisik.",
+    impact: "Pola penurunan dapat berkaitan dengan kehilangan aliran atau tekanan, sehingga perlu pemeriksaan segmen terkait.",
+    priority: "Tinggi — verifikasi segera",
+    priorityClass: "bg-red-100 text-red-700",
+    action: "Periksa tren waktu dan data pendukung lapangan.",
+    className: "border-sky-200 bg-sky-50 text-sky-900",
+    chipClass: "bg-sky-100 text-sky-700",
+  },
+  blockage: {
+    label: "Blockage",
+    pressure: "Pressure naik",
+    flow: "Flow rate turun",
+    rule: "P > median + 1 IQR dan Q < median − 0,5 IQR pada eksekusi ini.",
+    summary: "Pressure meningkat saat flow rate menurun.",
+    meaning: "Pola ini konsisten dengan blockage-like, tetapi perlu data valve atau tekanan hulu-hilir untuk konfirmasi.",
+    impact: "Hambatan aliran berpotensi menurunkan debit dan meningkatkan beban pada bagian hulu sistem.",
+    priority: "Tinggi — verifikasi segera",
+    priorityClass: "bg-red-100 text-red-700",
+    action: "Tinjau status valve dan observasi berdekatan.",
+    className: "border-orange-200 bg-orange-50 text-orange-900",
+    chipClass: "bg-orange-100 text-orange-700",
+  },
+  degradation: {
+    label: "Degradation",
+    pressure: "Pola campuran",
+    flow: "Tidak memenuhi 3 pola lain",
+    rule: "Kategori fallback: perlu tren waktu kontinu untuk menyimpulkan degradasi.",
+    summary: "Data ditandai anomali, tetapi kombinasinya tidak cocok dengan surge, leak, atau blockage.",
+    meaning: "Karena itu model memakai label Degradation sebagai kategori sisa; ini bukan bukti degradasi fisik bertahap.",
+    impact: "Belum ada dampak fisik spesifik yang dapat disimpulkan dari satu observasi ini.",
+    priority: "Sedang — telaah tren",
+    priorityClass: "bg-amber-100 text-amber-700",
+    action: "Bandingkan tren sebelum-sesudah, lalu cek temperature, pump speed, dan status valve.",
+    className: "border-amber-200 bg-amber-50 text-amber-900",
+    chipClass: "bg-amber-100 text-amber-700",
+  },
 };
 
 // Status ini menjelaskan keluaran algoritma pada dataset, bukan kondisi fisik
@@ -254,22 +314,8 @@ const LogRow = React.memo(function LogRow({ log, isExpanded, onToggle }) {
                 </div>
               </div>
 
-              {log.insight && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] leading-relaxed">
-                  <div className="p-2.5 bg-red-50/50 text-slate-700 rounded-lg border border-red-100">
-                    <strong className="text-red-700 block text-[10px] uppercase font-black mb-0.5">Ciri Pola Teramati</strong>
-                    {log.insight.reason}
-                  </div>
-                  <div className="p-2.5 bg-amber-50/50 text-slate-700 rounded-lg border border-amber-100">
-                    <strong className="text-amber-700 block text-[10px] uppercase font-black mb-0.5">Kemungkinan Makna / Batas</strong>
-                    {log.insight.impact}
-                  </div>
-                  <div className="p-2.5 bg-emerald-50/50 text-slate-700 rounded-lg border border-emerald-100">
-                    <strong className="text-emerald-700 block text-[10px] uppercase font-black mb-0.5">Validasi yang Disarankan</strong>
-                    {log.insight.solution}
-                  </div>
-                </div>
-              )}
+              <PatternExplanation log={log} />
+
             </div>
           </td>
         </tr>
@@ -278,8 +324,106 @@ const LogRow = React.memo(function LogRow({ log, isExpanded, onToggle }) {
   );
 });
 
+const PatternExplanation = ({ log }) => {
+  if (log.prediction === "Normal") {
+    return (
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5 text-[11px] text-emerald-800">
+        <strong className="block text-[10px] font-black uppercase">Ringkasan pola</strong>
+        Observasi ini tidak ditandai sebagai anomali oleh model pada eksekusi yang dipilih.
+      </div>
+    );
+  }
+
+  const guide = PATTERN_GUIDE[log.pattern] || PATTERN_GUIDE.degradation;
+  return (
+    <div className={`rounded-lg border p-2.5 text-[11px] ${guide.className}`}>
+      <strong className="block text-[10px] font-black uppercase">Kesimpulan cepat: {guide.label}</strong>
+      <div className="mt-1.5 flex flex-wrap gap-1.5 font-bold">
+        <span className={`rounded-full px-2 py-0.5 ${guide.chipClass}`}>{guide.pressure}</span>
+        <span className={`rounded-full px-2 py-0.5 ${guide.chipClass}`}>{guide.flow}</span>
+      </div>
+      <p className="mt-1.5 leading-relaxed"><strong>Dasar klasifikasi:</strong> {guide.summary}</p>
+      <p className="mt-1 leading-relaxed"><strong>Makna akademik:</strong> {guide.meaning}</p>
+      <div className="mt-2 border-t border-current/15 pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
+          <strong className="text-[10px] font-black uppercase">Rekomendasi tindak lanjut</strong>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${guide.priorityClass}`}>{guide.priority}</span>
+        </div>
+        <p className="mt-1.5 leading-relaxed"><strong>Dampak potensial:</strong> {guide.impact}</p>
+        <p className="mt-1 leading-relaxed"><strong>Verifikasi:</strong> {guide.action}</p>
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed opacity-75">Rekomendasi ini membantu menentukan pemeriksaan berikutnya; bukan perintah maintenance otomatis atau diagnosis fisik.</p>
+    </div>
+  );
+};
+
+function PatternGuide({ logs, selectedPattern, onPatternChange }) {
+  const [showMethodNote, setShowMethodNote] = useState(false);
+  const patternCounts = useMemo(() => logs.reduce((counts, log) => {
+    const pattern = String(log.pattern || "").toLowerCase();
+    if (counts[pattern] !== undefined && log.prediction !== "Normal") counts[pattern] += 1;
+    return counts;
+  }, { surge: 0, leak: 0, blockage: 0, degradation: 0 }), [logs]);
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-sm font-black text-slate-800">Peta Indikasi Pressure–Flow</h2>
+          <p className="text-[11px] leading-relaxed text-slate-500">Pilih pola untuk menyaring log dan gunakan sebagai alur penjelasan saat presentasi.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold">
+          <button type="button" aria-expanded={showMethodNote} onClick={() => setShowMethodNote((show) => !show)} className="inline-flex items-center gap-1 text-[#336B87] hover:underline">
+            {showMethodNote ? "Sembunyikan catatan metode" : "Mengapa hanya 2 variabel?"}
+            {showMethodNote ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+          {selectedPattern !== "all" && (
+            <button onClick={() => onPatternChange("all")} className="text-[#336B87] hover:underline">Tampilkan semua pola</button>
+          )}
+        </div>
+      </div>
+      {showMethodNote && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+          <strong className="text-slate-800">Empat variabel tetap digunakan oleh model:</strong> pressure, flow rate, temperature, dan pump speed. Peta ini hanya menampilkan pressure–flow karena aturan pemberian label Surge, Leak, dan Blockage pada penelitian memang membandingkan dua variabel tersebut terhadap median dan IQR. Temperature serta pump speed tetap tersedia pada nilai, sparkline, dan detail observasi sebagai konteks untuk memeriksa hasil; keduanya tidak disederhanakan menjadi aturan pola pada peta ini.
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {Object.entries(PATTERN_GUIDE).map(([key, guide]) => {
+          const active = selectedPattern === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onPatternChange(active ? "all" : key)}
+              className={`rounded-xl border p-3 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#336B87]/30 ${guide.className} ${active ? "ring-2 ring-[#336B87] shadow-sm" : "hover:-translate-y-0.5 hover:shadow-sm"}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black">{guide.label}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${guide.chipClass}`}>{patternCounts[key]} data</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                <span className={`rounded-full px-2 py-1 ${guide.chipClass}`}>{guide.pressure}</span>
+                <span className={`rounded-full px-2 py-1 ${guide.chipClass}`}>{guide.flow}</span>
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed opacity-80">{guide.rule}</p>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-[10px] leading-relaxed text-slate-400">Indikasi ini adalah aturan klasifikasi pada dataset penelitian, bukan konfirmasi kondisi fisik atau alarm operasional.</p>
+    </section>
+  );
+}
+
 const MobileLogCard = React.memo(function MobileLogCard({ log, isExpanded, onToggle }) {
   const cfg = getCfg(log.prediction);
+  const metricCharts = {
+    Pressure: ["pressure", "#ef4444"],
+    "Flow Rate": ["flow_rate", "#0891b2"],
+    Temperature: ["temperature", "#e11d48"],
+    "Pump Speed": ["pump_speed", "#9333ea"],
+  };
   const metrics = [
     ["Pressure", fmt(log.pressure), "Bar", "text-slate-800"],
     ["Flow Rate", fmt(log.flow_rate), "m³/h", "text-cyan-700"],
@@ -303,12 +447,16 @@ const MobileLogCard = React.memo(function MobileLogCard({ log, isExpanded, onTog
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        {metrics.map(([label, value, unit, color]) => (
-          <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-            <p className={`mt-0.5 text-sm font-black tabular-nums ${color}`}>{value} <span className="text-[9px] font-semibold text-slate-400">{unit}</span></p>
-          </div>
-        ))}
+        {metrics.map(([label, value, unit, color]) => {
+          const [key, chartColor] = metricCharts[label];
+          return (
+            <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+              <p className={`mt-0.5 text-sm font-black tabular-nums ${color}`}>{value} <span className="text-[9px] font-semibold text-slate-400">{unit}</span></p>
+              <div className="mt-1 h-6"><SparklineChart data={log.sparkData?.[key] || []} color={chartColor} width="100%" height={24} /></div>
+            </div>
+          );
+        })}
       </div>
 
       <button
@@ -321,18 +469,7 @@ const MobileLogCard = React.memo(function MobileLogCard({ log, isExpanded, onTog
 
       {isExpanded && (
         <div className="mt-3 space-y-2 border-t border-dashed border-slate-200 pt-3 text-[11px] leading-relaxed">
-          <div className="rounded-lg border border-red-100 bg-red-50/60 p-2.5 text-slate-700">
-            <strong className="block text-[10px] font-black uppercase text-red-700">Ciri Pola Teramati</strong>
-            {log.insight.reason}
-          </div>
-          <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-2.5 text-slate-700">
-            <strong className="block text-[10px] font-black uppercase text-amber-700">Kemungkinan Makna / Batas</strong>
-            {log.insight.impact}
-          </div>
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5 text-slate-700">
-            <strong className="block text-[10px] font-black uppercase text-emerald-700">Validasi yang Disarankan</strong>
-            {log.insight.solution}
-          </div>
+          <PatternExplanation log={log} />
         </div>
       )}
     </article>
@@ -351,9 +488,9 @@ export default function Monitoring() {
   const [expandedLogId, setExpandedLogId] = useState(null);
   const [selectedPred, setSelectedPred] = useState("all");
   const [selectedSeverity, setSelectedSeverity] = useState("all");
+  const [selectedPattern, setSelectedPattern] = useState("all");
   const [searchSegmentId, setSearchSegmentId] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [showReadingGuide, setShowReadingGuide] = useState(false);
 
   // --- FITUR: DROPDOWN RIWAYAT EKSEKUSI ---
   const [historyList, setHistoryList] = useState([]);
@@ -539,7 +676,7 @@ export default function Monitoring() {
   // supaya tidak "nyangkut" di halaman kosong.
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedPred, selectedSeverity, searchSegmentId, selectedRunId]);
+  }, [selectedPred, selectedSeverity, selectedPattern, searchSegmentId, selectedRunId]);
 
   useEffect(() => {
     setSelectedPred(searchParams.get("status") === "Anomaly" ? "Anomaly" : "all");
@@ -554,6 +691,7 @@ export default function Monitoring() {
     return allLogs.filter((l) => {
       if (selectedPred !== "all" && l.prediction !== selectedPred) return false;
       if (selectedSeverity !== "all" && l.severityCategory !== selectedSeverity) return false;
+      if (selectedPattern !== "all" && String(l.pattern).toLowerCase() !== selectedPattern) return false;
       if (
         searchSegmentId &&
         l.segment_id &&
@@ -562,7 +700,7 @@ export default function Monitoring() {
         return false;
       return true;
     });
-  }, [allLogs, selectedPred, selectedSeverity, searchSegmentId]);
+  }, [allLogs, selectedPred, selectedSeverity, selectedPattern, searchSegmentId]);
 
   // ==================== PAGINASI (MEMOIZED) ====================
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / PER_PAGE));
@@ -579,24 +717,6 @@ export default function Monitoring() {
     const normal = allLogs.filter((l) => l.prediction === "Normal").length;
     return { total, anomaly, normal };
   }, [allLogs]);
-
-  const executionSummary = useMemo(() => {
-    const anomalyRate = stats.total ? (stats.anomaly / stats.total) * 100 : 0;
-    const hasAnomaly = stats.anomaly > 0;
-
-    return {
-      anomalyRate,
-      title: hasAnomaly ? "Observasi anomali perlu ditinjau" : "Tidak ada observasi anomali",
-      description: hasAnomaly
-        ? `${stats.anomaly} dari ${stats.total} observasi (${anomalyRate.toFixed(1)}%) berbeda dari pola yang dipelajari model.`
-        : "Seluruh observasi pada eksekusi ini tidak ditandai anomali oleh model.",
-      className: hasAnomaly
-        ? "border-amber-200 bg-amber-50 text-amber-900"
-        : "border-emerald-200 bg-emerald-50 text-emerald-900",
-      iconClassName: hasAnomaly ? "text-amber-600" : "text-emerald-600",
-      Icon: hasAnomaly ? AlertTriangle : CheckCircle2,
-    };
-  }, [stats]);
 
   // ==================== EXPORT PDF (LAZY-LOADED) ====================
   const handleExportPDF = useCallback(async () => {
@@ -739,35 +859,15 @@ export default function Monitoring() {
           </div>
           </div>
 
-        <div className={`rounded-xl border p-4 ${executionSummary.className}`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <executionSummary.Icon size={20} className={`mt-0.5 shrink-0 ${executionSummary.iconClassName}`} />
-              <div>
-                <p className="text-sm font-black">{executionSummary.title}</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed">{executionSummary.description}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowReadingGuide((show) => !show)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-current/20 bg-white/70 px-3 py-2 text-xs font-bold hover:bg-white"
-            >
-              <Info size={13} /> {showReadingGuide ? "Sembunyikan cara baca" : "Cara membaca hasil"}
-            </button>
-          </div>
-
-          {showReadingGuide && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 border-t border-current/10 pt-3 text-[11px] leading-relaxed">
-              <p><strong>1. Nilai sensor:</strong> pressure, flow rate, temperature, dan pump speed ditampilkan dalam satuan asli.</p>
-              <p><strong>2. Status model:</strong> “Normal” berarti tidak ditandai; “Anomaly” berarti polanya berbeda menurut konfigurasi algoritma yang dipilih.</p>
-              <p><strong>3. Tindak lanjut:</strong> buka detail observasi untuk meninjau nilai dan konteksnya. Status ini bukan diagnosis fisik atau alarm real-time.</p>
-            </div>
-          )}
-        </div>
-
         {/* ================================================================
-            II. ALERT BANNER
+            II. PETA POLA + ALERT BANNER
             ================================================================ */}
+        <PatternGuide
+          logs={allLogs}
+          selectedPattern={selectedPattern}
+          onPatternChange={setSelectedPattern}
+        />
+
         <AlertBanner logs={allLogs} />
 
         {/* ================================================================

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -29,7 +30,83 @@ import { getAlgorithmResults, getScadaRecordCount, resetDashboardResults } from 
 
 const PRIMARY_COLOR = "#336B87";
 
+const WORKFLOW_STEPS = [
+  {
+    step: 1,
+    label: "Data Management",
+    phase: "Input & Validasi",
+    Icon: Database,
+    path: "/datamanagement",
+    action: "Buka Data Management",
+    summary: "Dataset SCADA diimpor sebelum digunakan oleh algoritma.",
+    input: "Berkas .csv atau .xlsx berisi observasi sensor dan atribut pendukung.",
+    process: "Sistem memeriksa format, nilai sensor, status biner, timestamp, dan segment ID sebelum menyimpan data.",
+    output: "Data valid tersimpan sebagai log sensor dan siap dipilih pada tahap eksekusi.",
+    details: [
+      "Empat sensor utama: pressure, flow rate, temperature, dan pump speed.",
+      "Atribut konteks seperti valve_status, pump_state, event_type, dan target tetap disimpan.",
+      "Sampel stratified untuk demo dibuat di luar website; website hanya mengimpor dan memvalidasi hasilnya.",
+    ],
+    note: "Gunakan data berurutan untuk membahas tren waktu. Sampel acak tidak cukup untuk membuktikan surge atau degradation sebagai tren kontinu.",
+  },
+  {
+    step: 2,
+    label: "Algorithm Execution",
+    phase: "Pemodelan Anomali",
+    Icon: Settings,
+    path: "/algorithmexecution",
+    action: "Buka Algorithm Execution",
+    summary: "Empat fitur sensor dinormalisasi lalu diproses oleh K-Means atau DBSCAN.",
+    input: "Log sensor yang telah tervalidasi serta pilihan algoritma dan normalisasi.",
+    process: "K-Means mengukur kedekatan terhadap centroid; DBSCAN menandai noise berdasarkan kepadatan tetangga.",
+    output: "Riwayat eksekusi berisi konfigurasi, metrik, observasi normal, dan observasi anomali.",
+    details: [
+      "Fitur model: pressure, flow rate, temperature, dan pump speed.",
+      "Normalisasi dilakukan sebelum perhitungan jarak atau kepadatan.",
+      "Silhouette dan Davies-Bouldin menjelaskan struktur internal klaster; metrik eksternal dibandingkan dengan target dataset.",
+    ],
+    note: "Hasil merupakan deteksi anomali pada dataset dan konfigurasi yang dipilih, bukan prediksi kegagalan fisik secara langsung.",
+  },
+  {
+    step: 3,
+    label: "Monitoring & Report",
+    phase: "Interpretasi & Tindak Lanjut",
+    Icon: FileText,
+    path: "/monitoring",
+    action: "Buka Monitoring",
+    summary: "Hasil eksekusi diterjemahkan menjadi log, tren sensor, indikasi pola, dan rekomendasi pemeriksaan.",
+    input: "Riwayat eksekusi algoritma terbaru atau riwayat yang dipilih pengguna.",
+    process: "Pengguna menyaring observasi, membuka detail, lalu membaca indikasi pressure–flow bersama empat nilai sensor.",
+    output: "Detail observasi, rekomendasi tindak lanjut berbasis indikasi, dan laporan PDF hasil filter.",
+    details: [
+      "Surge, leak, dan blockage ditampilkan sebagai pola pressure–flow pada dataset penelitian.",
+      "Temperature dan pump speed tetap ditampilkan sebagai konteks pemeriksaan, walaupun bukan aturan pada peta pola.",
+      "Rekomendasi membantu prioritas verifikasi; bukan perintah maintenance otomatis atau diagnosis fisik.",
+    ],
+    note: "Gunakan detail observasi untuk menjelaskan dasar klasifikasi, dampak potensial, dan langkah verifikasi saat sidang.",
+  },
+  {
+    step: 4,
+    label: "Dashboard",
+    phase: "Evaluasi & Rekapitulasi",
+    Icon: LayoutDashboard,
+    path: "/overview",
+    action: "Kembali ke Dashboard",
+    summary: "Riwayat eksperimen dibandingkan agar konfigurasi model dapat dibaca secara transparan.",
+    input: "Metrik dan konfigurasi dari seluruh riwayat Algorithm Execution serta jumlah data yang diimpor.",
+    process: "Dashboard mengurutkan eksperimen berdasarkan Silhouette Score dan menampilkan metrik pembanding.",
+    output: "Matriks komparasi, grafik hubungan jumlah anomali–Silhouette, dan ringkasan konfigurasi.",
+    details: [
+      "Konfigurasi dengan Silhouette tertinggi adalah ringkasan struktur internal terbaik pada data tersebut.",
+      "Silhouette tertinggi tidak otomatis berarti performa keseluruhan atau kesiapan operasional terbaik.",
+      "Gunakan Accuracy, Precision, Recall, F1 Score, dan Davies-Bouldin sebagai pembanding.",
+    ],
+    note: "Dashboard merangkum eksperimen; keputusan domain tetap membutuhkan verifikasi terhadap konteks data dan tujuan penelitian.",
+  },
+];
+
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [totalLogs, setTotalLogs] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -38,6 +115,7 @@ export default function Dashboard() {
   // State Panduan Langkah (User-Friendly)
   const [activeStep, setActiveStep] = useState(1);
   const [showGuide, setShowGuide] = useState(true);
+  const [showSampleTransparency, setShowSampleTransparency] = useState(false);
 
   /* ================= FETCH DATA & STATS ================= */
   const fetchData = useCallback(async () => {
@@ -151,6 +229,8 @@ export default function Dashboard() {
   };
 
   const currentStatus = getAnomalyStatusColor(best?.anomaly);
+  const activeWorkflow = WORKFLOW_STEPS.find((item) => item.step === activeStep) || WORKFLOW_STEPS[0];
+  const ActiveWorkflowIcon = activeWorkflow.Icon;
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 sm:p-4 md:p-6 font-sans text-slate-600 antialiased">
@@ -161,13 +241,16 @@ export default function Dashboard() {
           <div className="p-4 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div className="flex items-center gap-2">
               <HelpCircle size={18} style={{ color: PRIMARY_COLOR }} />
-              <h2 className="text-xs font-black text-slate-800 tracking-wide uppercase">Alur Cara Kerja Sistem</h2>
+              <div>
+                <h2 className="text-xs font-black text-slate-800 tracking-wide uppercase">Alur Kerja Sistem</h2>
+                <p className="text-[10px] text-slate-400">Data → Model → Monitoring → Evaluasi</p>
+              </div>
             </div>
             <button 
               onClick={() => setShowGuide(!showGuide)}
               className="text-[11px] px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold transition-all shadow-2xs w-full sm:w-auto text-slate-700"
             >
-              {showGuide ? "Sembunyikan Panduan" : "Tampilkan Panduan Pengujian"}
+              {showGuide ? "Sembunyikan Alur" : "Tampilkan Alur Sistem"}
             </button>
           </div>
 
@@ -176,12 +259,9 @@ export default function Dashboard() {
               
               {/* Menu Navigasi Langkah Kontrol */}
               <div className="flex flex-row lg:flex-col gap-1.5 border-b lg:border-b-0 lg:border-r border-slate-100 pb-3 lg:pb-0 lg:pr-4 overflow-x-auto">
-                {[
-                  { step: 1, label: "1. Data Management", icon: <Database size={13} /> },
-                  { step: 2, label: "2. Eksekusi Algoritma", icon: <Settings size={13} /> },
-                  { step: 3, label: "3. Monitoring & Report", icon: <FileText size={13} /> },
-                  { step: 4, label: "4. Dashboard", icon: <LayoutDashboard size={13} /> },
-                ].map((s) => (
+                {WORKFLOW_STEPS.map((s) => {
+                  const StepIcon = s.Icon;
+                  return (
                   <button
                     key={s.step}
                     onClick={() => setActiveStep(s.step)}
@@ -191,22 +271,93 @@ export default function Dashboard() {
                         : "bg-slate-50 text-slate-500 hover:bg-slate-100/80"
                     }`}
                   >
-                    {s.icon}
-                    {s.label}
+                    <StepIcon size={13} />
+                    {s.step}. {s.label}
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Konten Utama Berdasarkan Langkah */}
               <div className="lg:col-span-3 min-h-[160px] flex flex-col justify-between">
                 <div>
-                  {/* LANGKAH 1 */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-white p-2 text-[#336B87] shadow-sm"><ActiveWorkflowIcon size={18} /></div>
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-[#336B87]">Tahap {activeWorkflow.step} dari {WORKFLOW_STEPS.length} · {activeWorkflow.phase}</span>
+                        <h3 className="mt-0.5 text-sm font-black text-slate-800">{activeWorkflow.label}</h3>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-600">{activeWorkflow.summary}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {[
+                        ["Input", activeWorkflow.input],
+                        ["Proses Sistem", activeWorkflow.process],
+                        ["Keluaran", activeWorkflow.output],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</p>
+                          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <ul className="mt-3 grid grid-cols-1 gap-1.5 text-[11px] leading-relaxed text-slate-600 sm:grid-cols-2">
+                      {activeWorkflow.details.map((detail) => (
+                        <li key={detail} className="flex gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-[#336B87]" />{detail}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5 text-[10px] leading-relaxed text-blue-800"><Info size={12} className="mr-1 inline" />{activeWorkflow.note}</p>
+
+                    {activeWorkflow.step === 1 && (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          aria-expanded={showSampleTransparency}
+                          onClick={() => setShowSampleTransparency((show) => !show)}
+                          className="flex w-full items-center justify-between gap-3 p-3 text-left text-[11px] font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          <span>Transparansi sampel demo (500 observasi)</span>
+                          <span className="text-[#336B87]">{showSampleTransparency ? "Sembunyikan" : "Lihat metode"}</span>
+                        </button>
+
+                        {showSampleTransparency && (
+                          <div className="border-t border-slate-200 p-3 text-[11px] leading-relaxed text-slate-600">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                              <div className="rounded-lg bg-slate-50 p-2.5">
+                                <strong className="block text-[10px] uppercase tracking-wider text-slate-800">1. Sumber</strong>
+                                Dataset publik SCADA Pipeline Operations dari Kaggle, berkas <code>dataset-pipeline.xlsx</code>: 1.000 observasi dan 13 kolom. Ini bukan data operasional perusahaan.
+                              </div>
+                              <div className="rounded-lg bg-slate-50 p-2.5">
+                                <strong className="block text-[10px] uppercase tracking-wider text-slate-800">2. Pengambilan</strong>
+                                Sebanyak 500 baris dipilih dengan random stratified sampling berdasarkan <code>event_type</code>. Kuota tiap kelas proporsional; sisa pembulatan diberikan pada pecahan kuota terbesar.
+                              </div>
+                              <div className="rounded-lg bg-slate-50 p-2.5">
+                                <strong className="block text-[10px] uppercase tracking-wider text-slate-800">3. Replikasi</strong>
+                                Skrip <code>scripts/create_stratified_sample.js</code> memakai seed 42, mengacak dalam tiap strata, lalu mengurutkan kembali baris terpilih menurut indeks sumber.
+                              </div>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-1.5 text-center text-[10px] font-bold sm:grid-cols-5">
+                              {[["Normal", 347], ["Degradation", 68], ["Leak", 32], ["Surge", 30], ["Blockage", 23]].map(([label, count]) => (
+                                <span key={label} className="rounded border border-slate-200 bg-white px-1.5 py-1">{label}: {count}</span>
+                              ))}
+                            </div>
+                            <p className="mt-2"><strong>Artefak yang dicatat:</strong> berkas keluaran <code>scada_stratified_500_seed42.xlsx</code> dan metadata JSON berisi nama sumber, seed, metode, jumlah baris, serta kuota strata.</p>
+                            <p className="mt-1 rounded bg-amber-50 p-2 text-amber-800"><strong>Batas penggunaan:</strong> sampel dipakai untuk demo, bukan untuk membuktikan tren waktu kontinu. Eksperimen utama tetap direkomendasikan memakai seluruh 1.000 observasi.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/*
+                  LANGKAH 1
                   {activeStep === 1 && (
                     <div className="space-y-3 animate-fadeIn">
                       <span className="text-[9px] bg-blue-50 text-blue-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-blue-100">Tahap Ingesti</span>
                       <h3 className="text-xs font-bold text-slate-800">Unggah Dataset Sensor SCADA (Kaggle Dataset)</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Lakukan impor berkas log operasional berformat <b>.csv</b> or <b>.xlsx</b> pada menu manajemen data. Sistem membaca relasi multivariat yang terdiri dari data kontinu (sensor fisik), status mekanis alat, hingga log historis indikator kejadian:
+                        Lakukan impor berkas log operasional berformat <b>.csv</b> atau <b>.xlsx</b> pada menu manajemen data. Sistem memvalidasi kolom sensor, status alat, dan indikator kejadian sebelum data digunakan.
                       </p>
                       
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 pt-1">
@@ -239,13 +390,13 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* LANGKAH 2 */}
+                  LANGKAH 2
                   {activeStep === 2 && (
                     <div className="space-y-3 animate-fadeIn">
                       <span className="text-[9px] bg-purple-50 text-purple-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-purple-100">Tahap Modeling</span>
                       <h3 className="text-xs font-bold text-slate-800">Komparasi Metode Pengelompokan Klaster</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Sistem melakukan ekstraksi matematis pada 4 kluster parameter fisis utama. Matriks ini ditransformasi menggunakan normalisasi skala jarak sebelum diproses ke dalam model <b>K-Means Clustering</b> (berbasis Centroid Distance) atau <b>DBSCAN</b> (berbasis Density Neighborhood):
+                        Sistem menggunakan empat fitur sensor, lalu menerapkan normalisasi sebelum data diproses oleh <b>K-Means Clustering</b> (jarak ke centroid) atau <b>DBSCAN</b> (kepadatan tetangga):
                       </p>
                       
                       <div className="flex flex-wrap gap-1.5 py-1">
@@ -261,18 +412,18 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* LANGKAH 3 */}
+                  LANGKAH 3
                   {activeStep === 3 && (
                     <div className="space-y-3 animate-fadeIn">
                       <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-emerald-100">Tahap Audit</span>
                       <h3 className="text-xs font-bold text-slate-800">Isolasi Tabular & Eksportasi Dokumen Cetak</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Melalui menu <b>Monitoring & Report</b>, validator/operator dapat melacak letak indeks baris data anomali secara presisi. Record tersebut dapat diisolasi berdasarkan klaster deviasinya dan diunduh langsung menjadi berkas laporan laporan fisik PDF Cetak untuk kebutuhan dokumentasi lapangan.
+                        Melalui menu <b>Monitoring & Report</b>, pengguna memilih hasil eksekusi, menyaring observasi, lalu membuka detail nilai sensor dan tren. Indikasi pola serta rekomendasi tindak lanjut membantu menentukan pemeriksaan berikutnya, dan hasil filter dapat diekspor menjadi PDF.
                       </p>
                     </div>
                   )}
 
-                  {/* LANGKAH 4 */}
+                  LANGKAH 4
                   {activeStep === 4 && (
                     <div className="space-y-3 animate-fadeIn">
                       <span className="text-[9px] bg-orange-50 text-orange-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider border border-orange-100">Tahap Rekapitulasi</span>
@@ -282,17 +433,33 @@ export default function Dashboard() {
                       </p>
                     </div>
                   )}
+                  */}
                 </div>
 
                 {/* Tombol Navigasi Footer Langkah */}
-                <div className="flex justify-end pt-3 border-t border-slate-100 mt-4">
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 mt-4 sm:flex-row sm:items-center sm:justify-between">
                   <button
-                    onClick={() => setActiveStep(activeStep < 4 ? activeStep + 1 : 1)}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-white px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 shadow-2xs transition-all"
+                    onClick={() => navigate(activeWorkflow.path)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[#336B87]/20 bg-[#336B87]/5 px-3 py-2 text-[11px] font-bold text-[#336B87] hover:bg-[#336B87]/10"
                   >
-                    {activeStep === 4 ? "Ulangi Alur" : "Langkah Selanjutnya"}
+                    {activeWorkflow.action}
                     <ArrowRight size={12} />
                   </button>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setActiveStep((step) => (step === 1 ? WORKFLOW_STEPS.length : step - 1))}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                    >
+                      Sebelumnya
+                    </button>
+                  <button
+                    onClick={() => setActiveStep(activeStep < WORKFLOW_STEPS.length ? activeStep + 1 : 1)}
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-white px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 shadow-2xs transition-all"
+                  >
+                    {activeStep === WORKFLOW_STEPS.length ? "Ulangi Alur" : "Langkah Selanjutnya"}
+                    <ArrowRight size={12} />
+                  </button>
+                  </div>
                 </div>
 
               </div>

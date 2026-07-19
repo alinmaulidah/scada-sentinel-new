@@ -22,6 +22,88 @@ import {
 import { runAlgorithm } from "../features/algorithm/algorithm.api";
 import { getAppSettings } from "../lib/appSettings";
 
+function AlgorithmGuide({ algorithm, normalization, onClose }) {
+  const isKmeans = algorithm === "kmeans";
+  const isMinMax = normalization === "minmax";
+  const normalizationFormula = isMinMax
+    ? "x′ = (x − min(x)) / (max(x) − min(x))"
+    : "z = (x − μ) / σ";
+  const normalizationExplanation = isMinMax
+    ? "Setiap fitur dipetakan ke rentang 0–1 sehingga perbedaan satuan tidak mendominasi perhitungan jarak."
+    : "Setiap fitur dipusatkan pada rata-rata 0 dengan standar deviasi 1 agar skala fitur dapat dibandingkan.";
+  const algorithmSteps = isKmeans
+    ? [
+        "Uji k = 2 sampai 5 dengan inisialisasi k-means++, n_init = 10, dan random_state = 42.",
+        "Hitung Silhouette Score untuk setiap kandidat k, lalu pilih nilai k dengan skor tertinggi.",
+        "Hitung jarak setiap observasi ke centroid terdekat; observasi dengan jarak di atas median + 3 MAD ditandai anomali. Jika MAD = 0, digunakan persentil ke-95.",
+      ]
+    : [
+        "Tetapkan min_samples = 5 (empat dimensi fitur + 1).",
+        "Hitung jarak tetangga ke-5 dan estimasi eps dari titik elbow pada kurva k-distance.",
+        "Jalankan DBSCAN; label −1 berarti noise dan ditandai sebagai anomali.",
+      ];
+
+  return (
+    <section className="rounded-2xl border border-[#336B87]/20 bg-[#336B87]/5 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2.5">
+          <div className="rounded-xl bg-white p-2 text-[#336B87] shadow-sm"><Workflow size={18} /></div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-[#336B87]">Panduan Alur Algoritma</p>
+            <h2 className="text-sm font-black text-slate-800">{isKmeans ? "K-Means Clustering" : "DBSCAN"} + {isMinMax ? "Min-Max Scaling" : "Z-Score Standardization"}</h2>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-600">Normalisasi selalu dilakukan sebelum algoritma agar empat fitur sensor berada pada skala yang sebanding.</p>
+          </div>
+        </div>
+        <button onClick={onClose} aria-label="Tutup panduan algoritma" className="rounded-lg p-1 text-slate-400 hover:bg-white hover:text-slate-600"><X size={16} /></button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Normalisasi terpilih</p>
+          <p className="mt-1 font-mono text-sm font-black text-[#336B87]">{normalizationFormula}</p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">{normalizationExplanation}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Fitur yang diproses</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {["pressure", "flow_rate", "temperature", "pump_speed"].map((feature) => (
+              <span key={feature} className="rounded-full bg-slate-100 px-2 py-1 font-mono text-[10px] font-bold text-slate-700">{feature}</span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-600">Kolom <code>target</code> tidak dipakai saat fitting atau penentuan anomali; hanya dipakai setelahnya untuk menghitung metrik evaluasi.</p>
+        </div>
+      </div>
+
+      <ol className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-3">
+        <li className="rounded-xl border border-slate-200 bg-white p-3">
+          <span className="text-[9px] font-black text-[#336B87]">01 · SIAPKAN DATA</span>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">Ambil log dari database menurut timestamp, bersihkan nilai sensor, lalu lewati baris yang tidak lengkap pada empat fitur. Nilai ekstrem valid tidak dihapus.</p>
+        </li>
+        <li className="rounded-xl border border-slate-200 bg-white p-3">
+          <span className="text-[9px] font-black text-[#336B87]">02 · NORMALISASI</span>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">Terapkan {isMinMax ? "Min-Max" : "Z-Score"} pada seluruh empat fitur sebelum perhitungan jarak atau kepadatan.</p>
+        </li>
+        <li className="rounded-xl border border-slate-200 bg-white p-3">
+          <span className="text-[9px] font-black text-[#336B87]">03 · {isKmeans ? "BENTUK KLASTER" : "CARI DENSITAS"}</span>
+          <ul className="mt-1 space-y-1 text-[11px] leading-relaxed text-slate-600">
+            {algorithmSteps.map((step) => <li key={step}>• {step}</li>)}
+          </ul>
+        </li>
+        <li className="rounded-xl border border-slate-200 bg-white p-3 lg:col-span-2">
+          <span className="text-[9px] font-black text-[#336B87]">04 · INTERPRETASI MONITORING</span>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">Observasi anomali dipetakan sebagai surge, leak, blockage, atau degradation menggunakan median dan IQR pressure–flow. Ini adalah interpretasi pola dataset setelah anomali ditemukan, bukan dasar fitting model.</p>
+        </li>
+        <li className="rounded-xl border border-slate-200 bg-white p-3">
+          <span className="text-[9px] font-black text-[#336B87]">05 · EVALUASI & SIMPAN</span>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">Simpan hasil, parameter, dan detail observasi. Hitung Silhouette, Davies-Bouldin, Accuracy, Precision, Recall, dan F1 sebagai evaluasi pada dataset berlabel yang sama.</p>
+        </li>
+      </ol>
+
+      <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800"><strong>Batas akademik:</strong> metrik eksternal pada halaman ini bukan estimasi performa out-of-sample dan hasil anomali bukan diagnosis kondisi fisik pipeline.</p>
+    </section>
+  );
+}
+
 const AlgorithmExecution = () => {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("kmeans");
   const [selectedNormalization, setSelectedNormalization] = useState("minmax");
@@ -98,26 +180,9 @@ const AlgorithmExecution = () => {
               onClick={() => setShowGuide(!showGuide)}
               className="text-xs font-bold text-[#336B87] bg-slate-100 hover:bg-slate-200/80 px-3 py-1.5 rounded-xl transition-all"
             >
-              {showGuide ? "Tutup" : "Panduan"}
+              {showGuide ? "Tutup Panduan" : "Panduan Alur"}
             </button>
           </div>
-
-          {showGuide && (
-            <div className="mb-5 p-4 rounded-2xl border border-dashed border-[#336B87]/40 bg-slate-50 flex flex-col justify-between transition-all animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <span className="text-[10px] uppercase font-black tracking-wider text-[#336B87] flex items-center gap-1">
-                  <Workflow size={12} /> Info Inisialisasi
-                </span>
-                <button onClick={() => setShowGuide(false)} className="text-slate-400 hover:text-slate-600">
-                  <X size={14} />
-                </button>
-              </div>
-              <div className="mt-3 text-xs text-slate-600 space-y-2 leading-relaxed">
-                <p className="font-bold text-slate-800">Reproduksibilitas eksperimen</p>
-                <p>K-Means menggunakan inisialisasi <span className="font-bold text-amber-600">k-means++</span> dengan <span className="font-bold text-amber-600">random state 42</span>, sehingga konfigurasi dan data yang sama menghasilkan keluaran yang sama.</p>
-              </div>
-            </div>
-          )}
 
           {/* ALGORITHM SELECTOR */}
           <div className="space-y-1.5 mb-4">
@@ -173,6 +238,14 @@ const AlgorithmExecution = () => {
 
         {/* RIGHT PANEL: MAIN DASHBOARD */}
         <div className="xl:col-span-3 space-y-6">
+          {showGuide && (
+            <AlgorithmGuide
+              algorithm={selectedAlgorithm}
+              normalization={selectedNormalization}
+              onClose={() => setShowGuide(false)}
+            />
+          )}
+
           <div className="bg-white border border-slate-200 rounded-[2rem] p-5 sm:p-6 shadow-sm">
             
             {/* HEADER METADATA BAR */}

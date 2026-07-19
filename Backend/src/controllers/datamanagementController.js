@@ -32,6 +32,11 @@ const toNum = (v) => {
   return Number.isFinite(value) ? value : null;
 };
 
+const toInteger = (value) => {
+  const number = toNum(value);
+  return Number.isInteger(number) ? number : null;
+};
+
 const toBinary = (value) => ([0, 1].includes(Number(value)) ? Number(value) : null);
 const toIntegerIn = (value, allowed) => (allowed.includes(Number(value)) ? Number(value) : null);
 
@@ -66,7 +71,7 @@ const getScadaData = async (req, res) => {
   `SELECT 
     id,
     DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:%s') AS timestamp, -- Memaksa format string
-    segment_id,
+    CAST(segment_id AS UNSIGNED) AS segment_id,
     pressure,
     flow_rate,
     temperature,
@@ -107,7 +112,7 @@ const importScadaData = async (req, res) => {
 
     const values = rawData.map((item, index) => [
       parseTimestamp(field(item, "timestamp", "Timestamp")),
-      toNum(field(item, "segment_id", "segment_ID", "Segment ID")),
+      toInteger(field(item, "segment_id", "segment_ID", "Segment ID")),
       toNum(field(item, "pressure", "Pressure")),
       toNum(field(item, "flow_rate", "Flow Rate")),
       toNum(field(item, "temperature", "Temperature")),

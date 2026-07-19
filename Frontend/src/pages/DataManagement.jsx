@@ -121,29 +121,11 @@ const DataManagement = () => {
     }
   };
 
-  // Helper fungsi untuk menjaga aplikasi tidak crash jika data null/undefined
-  const formatNum = (val, decimal = 2) => {
-    if (val === null || val === undefined || isNaN(Number(val))) return "0.00";
-    return Number(val).toFixed(decimal);
-  };
-
-  // Helper pewarnaan dinamis berdasarkan tipe event (Sangat Bagus untuk Demo Sidang!)
-  const getEventBadgeClass = (eventType) => {
-    const type = eventType ? eventType.toLowerCase() : "normal";
-    switch(type) {
-      case "normal":
-        return "bg-slate-50 text-slate-400 border-slate-100";
-      case "surge":
-        return "bg-cyan-50 text-cyan-600 border-cyan-100";
-      case "leak":
-        return "bg-red-50 text-red-600 border-red-100 font-bold animate-pulse";
-      case "blockage":
-        return "bg-orange-50 text-orange-600 border-orange-100 font-bold";
-      case "degradation":
-        return "bg-amber-50 text-amber-600 border-amber-100";
-      default:
-        return "bg-gray-50 text-gray-500 border-gray-100";
-    }
+  const formatValue = (value) => {
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? number.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 6 })
+      : "-";
   };
 
   return (
@@ -204,14 +186,14 @@ const DataManagement = () => {
                   <th className="p-3.5 text-center w-14">No</th>
                   <th className="p-3.5 w-40">Timestamp</th>
                   <th className="p-3.5 w-20 text-center">Seg ID</th>
-                  <th className="p-3.5 w-24 text-right">Pressure</th>
-                  <th className="p-3.5 w-24 text-right">Flow Rate</th>
-                  <th className="p-3.5 w-20 text-right">Temp</th>
+                  <th className="p-3.5 w-24 text-right">Pressure (bar)</th>
+                  <th className="p-3.5 w-24 text-right">Flow Rate (m³/h)</th>
+                  <th className="p-3.5 w-20 text-right">Temp (°C)</th>
                   <th className="p-3.5 w-20 text-center">Valve</th>
                   <th className="p-3.5 w-20 text-center">Pump State</th>
-                  <th className="p-3.5 w-24 text-right">Pump Speed</th>
+                  <th className="p-3.5 w-24 text-right">Pump Speed (rpm)</th>
                   <th className="p-3.5 w-20 text-center">Compressor</th>
-                  <th className="p-3.5 w-24 text-right">Energy Cons.</th>
+                  <th className="p-3.5 w-24 text-right">Energy (kWh)</th>
                   <th className="p-3.5 w-20 text-center">Alarm</th>
                   <th className="p-3.5 w-28 text-center">Event Type</th>
                   <th className="p-3.5 w-18 text-center bg-slate-100 font-black text-slate-600 border-l border-gray-200">Target</th>
@@ -235,32 +217,16 @@ const DataManagement = () => {
                         <td className="p-3 text-center text-gray-300 font-bold">{(page - 1) * 10 + index + 1}</td>
                         <td className="p-3 font-mono text-gray-400 whitespace-nowrap">{d.timestamp || "-"}</td>
                         <td className="p-3 text-center font-bold text-slate-800">{d.segment_id}</td>
-                        <td className="p-3 text-right font-semibold text-blue-600 font-mono">{formatNum(d.pressure, 2)} bar</td>
-                        <td className="p-3 text-right text-slate-700 font-mono">{formatNum(d.flow_rate, 2)} m³/h</td>
-                        <td className="p-3 text-right text-slate-500 font-mono">{formatNum(d.temperature, 1)}°C</td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wide border ${d.valve_status == 1 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : d.valve_status == 0 ? 'bg-gray-100 text-gray-400 border-transparent' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                            {d.valve_status == 1 ? 'OPEN' : d.valve_status == 0 ? 'CLOSE' : `STATE ${d.valve_status}`}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wide border ${d.pump_state == 1 ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-gray-100 text-gray-400 border-transparent'}`}>
-                            {d.pump_state == 1 ? 'ON' : 'OFF'}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono text-right text-slate-600">{formatNum(d.pump_speed, 0)} rpm</td>
-                        <td className="p-3 text-center font-bold text-slate-500 font-mono">{d.compressor_state ?? "-"}</td>
-                        <td className="p-3 font-mono text-right text-slate-400">{formatNum(d.energy_consumption, 1)} kWh</td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide border ${d.alarm_triggered == 1 ? 'border-red-200 bg-red-50 text-red-600 shadow-sm' : 'border-gray-100 bg-gray-50 text-gray-400'}`}>
-                            {d.alarm_triggered == 1 ? '⚠️ ALARM' : '🟢 CLEAR'}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[9px] border tracking-wider font-bold ${getEventBadgeClass(d.event_type)}`}>
-                            {(d.event_type || "NORMAL").toUpperCase()}
-                          </span>
-                        </td>
+                        <td className="p-3 text-right font-semibold text-blue-600 font-mono">{formatValue(d.pressure)}</td>
+                        <td className="p-3 text-right text-slate-700 font-mono">{formatValue(d.flow_rate)}</td>
+                        <td className="p-3 text-right text-slate-500 font-mono">{formatValue(d.temperature)}</td>
+                        <td className="p-3 text-center font-mono">{formatValue(d.valve_status)}</td>
+                        <td className="p-3 text-center font-mono">{formatValue(d.pump_state)}</td>
+                        <td className="p-3 font-mono text-right text-slate-600">{formatValue(d.pump_speed)}</td>
+                        <td className="p-3 text-center font-bold text-slate-500 font-mono">{formatValue(d.compressor_state)}</td>
+                        <td className="p-3 font-mono text-right text-slate-400">{formatValue(d.energy_consumption)}</td>
+                        <td className="p-3 text-center font-mono">{formatValue(d.alarm_triggered)}</td>
+                        <td className="p-3 text-center font-mono">{d.event_type || "-"}</td>
                         <td className={`p-3 text-center font-black border-l border-gray-200 text-xs ${d.target == 1 ? 'text-red-600 bg-red-50/50' : 'text-slate-400 bg-slate-50/50'}`}>
                           {d.target}
                         </td>

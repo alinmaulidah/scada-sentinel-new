@@ -3,9 +3,9 @@ import { Shield, AlertTriangle, CheckCircle, Search, X } from "lucide-react";
 
 const SEVERITY_CARDS = [
   { key: "all", label: "Semua", icon: null, color: "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200", activeColor: "bg-slate-700 text-white border-slate-500" },
-  { key: "Critical", label: "Indikasi tinggi", icon: null, color: "bg-red-50 text-red-500 border-red-200 hover:bg-red-100", activeColor: "bg-red-600 text-white border-red-500" },
+  { key: "Critical", label: "Indikasi tinggi", icon: null, color: "bg-red-50 text-red-500 border-red-200 hover:bg-red-100", activeColor: "bg-red-500 text-white border-red-500" },
   { key: "Warning", label: "Indikasi sedang", icon: null, color: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100", activeColor: "bg-amber-500 text-white border-amber-500" },
-  { key: "Safe", label: "Tidak ditandai", icon: CheckCircle, color: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100", activeColor: "bg-emerald-600 text-white border-emerald-500" },
+  { key: "Safe", label: "Tidak ditandai", icon: CheckCircle, color: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100", activeColor: "bg-emerald-500 text-white border-emerald-500" },
 ];
 
 export default function QuickFilterCards({ selectedSeverity = "all", onSeverityChange, searchSegmentId = "", onSearchChange, logs = [] }) {

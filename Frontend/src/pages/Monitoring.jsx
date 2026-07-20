@@ -64,7 +64,7 @@ const PATTERN_GUIDE = {
     summary: "Pressure dan flow rate sama-sama meningkat dibanding pola tengah data.",
     meaning: "Kenaikan serentak ini konsisten dengan surge-like, tetapi belum membuktikan osilasi tekanan tanpa data waktu kontinu.",
     impact: "Perubahan pressure yang cepat dapat mengganggu kestabilan operasi dan perlu ditinjau sebelum membebani peralatan.",
-    priority: "Tinggi — verifikasi segera",
+    priority: "Tinggi verifikasi segera",
     priorityClass: "bg-red-100 text-red-700",
     action: "Bandingkan dengan observasi sebelum dan sesudahnya.",
     className: "border-violet-200 bg-violet-50 text-violet-900",
@@ -78,7 +78,7 @@ const PATTERN_GUIDE = {
     summary: "Pressure dan flow rate sama-sama menurun dibanding pola tengah data.",
     meaning: "Pola ini konsisten dengan leak-like, bukan bukti kebocoran fisik.",
     impact: "Pola penurunan dapat berkaitan dengan kehilangan aliran atau tekanan, sehingga perlu pemeriksaan segmen terkait.",
-    priority: "Tinggi — verifikasi segera",
+    priority: "Tinggi verifikasi segera",
     priorityClass: "bg-red-100 text-red-700",
     action: "Periksa tren waktu dan data pendukung lapangan.",
     className: "border-sky-200 bg-sky-50 text-sky-900",
@@ -92,7 +92,7 @@ const PATTERN_GUIDE = {
     summary: "Pressure meningkat saat flow rate menurun.",
     meaning: "Pola ini konsisten dengan blockage-like, tetapi perlu data valve atau tekanan hulu-hilir untuk konfirmasi.",
     impact: "Hambatan aliran berpotensi menurunkan debit dan meningkatkan beban pada bagian hulu sistem.",
-    priority: "Tinggi — verifikasi segera",
+    priority: "Tinggi verifikasi segera",
     priorityClass: "bg-red-100 text-red-700",
     action: "Tinjau status valve dan observasi berdekatan.",
     className: "border-orange-200 bg-orange-50 text-orange-900",
@@ -384,7 +384,7 @@ function PatternGuide({ logs, selectedPattern, onPatternChange }) {
       </div>
       {showMethodNote && (
         <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
-          <strong className="text-slate-800">Empat variabel tetap digunakan oleh model:</strong> pressure, flow rate, temperature, dan pump speed. Peta ini hanya menampilkan pressure–flow karena aturan pemberian label Surge, Leak, dan Blockage pada penelitian memang membandingkan dua variabel tersebut terhadap median dan IQR. Temperature serta pump speed tetap tersedia pada nilai, sparkline, dan detail observasi sebagai konteks untuk memeriksa hasil; keduanya tidak disederhanakan menjadi aturan pola pada peta ini.
+          <strong className="text-slate-800">Empat variabel tetap digunakan oleh model:</strong> pressure, flow rate, temperature, dan pump speed. Peta ini hanya menampilkan pressure–flow karena aturan pemberian label Surge, Leak, dan Blockage pada penelitian memang membandingkan dua variabel tersebut terhadap median dan IQR. Temperature serta pump speed tetap tersedia pada nilai, sparkline, dan detail observasi sebagai konteks untuk memeriksa hasil keduanya tidak disederhanakan menjadi aturan pola pada peta ini.
         </div>
       )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">

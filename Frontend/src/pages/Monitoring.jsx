@@ -874,7 +874,7 @@ export default function Monitoring() {
             III. PANEL KONTROL: FILTER + DROPDOWN HISTORY + EXPORT PDF
             ================================================================ */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4">
-          <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
+          <div className="flex flex-col gap-3 items-start justify-between 2xl:flex-row 2xl:items-center">
 
             <div className="min-w-0 flex-1">
               <QuickFilterCards
@@ -886,8 +886,8 @@ export default function Monitoring() {
               />
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto">
-              <div className="relative w-full sm:flex-1 sm:min-w-[200px] lg:w-80 lg:flex-none">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center 2xl:w-auto">
+              <div className="relative w-full sm:flex-1 sm:min-w-[200px] 2xl:w-56 2xl:flex-none">
                 <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
                   <History size={12} className="text-slate-400" />
                   <select

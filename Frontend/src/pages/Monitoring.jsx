@@ -387,7 +387,7 @@ function PatternGuide({ logs, selectedPattern, onPatternChange }) {
           <strong className="text-slate-800">Empat variabel tetap digunakan oleh model:</strong> pressure, flow rate, temperature, dan pump speed. Peta ini hanya menampilkan pressure–flow karena aturan pemberian label Surge, Leak, dan Blockage pada penelitian memang membandingkan dua variabel tersebut terhadap median dan IQR. Temperature serta pump speed tetap tersedia pada nilai, sparkline, dan detail observasi sebagai konteks untuk memeriksa hasil keduanya tidak disederhanakan menjadi aturan pola pada peta ini.
         </div>
       )}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {Object.entries(PATTERN_GUIDE).map(([key, guide]) => {
           const active = selectedPattern === key;
           return (
@@ -822,14 +822,14 @@ export default function Monitoring() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 font-sans text-slate-600">
-      <div className="max-w-[1600px] mx-auto space-y-3">
+      <div className="mx-auto w-full max-w-[1600px] space-y-3">
 
         {/* ================================================================
             I. HEADER + NORMALISASI BADGE
             ================================================================ */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h1 className="text-base font-black text-slate-800 flex items-center gap-1.5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-base font-black text-slate-800 flex items-center gap-1.5">
               Monitoring Hasil Deteksi Anomali
             </h1>
             <p className="text-[11px] text-slate-400 font-semibold mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -841,7 +841,7 @@ export default function Monitoring() {
               {meta?.algorithm && (
                 <>
                   <span className="text-slate-300">|</span>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
                     <span className="text-slate-400">Algoritma:</span>
                     <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold border border-slate-200">
                       {meta.algorithm.toUpperCase()}
@@ -873,10 +873,10 @@ export default function Monitoring() {
         {/* ================================================================
             III. PANEL KONTROL: FILTER + DROPDOWN HISTORY + EXPORT PDF
             ================================================================ */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4">
+          <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
 
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <QuickFilterCards
                 selectedSeverity={selectedSeverity}
                 onSeverityChange={setSelectedSeverity}
@@ -886,8 +886,8 @@ export default function Monitoring() {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto">
+              <div className="relative w-full sm:flex-1 sm:min-w-[200px] lg:w-80 lg:flex-none">
                 <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
                   <History size={12} className="text-slate-400" />
                   <select
@@ -896,7 +896,7 @@ export default function Monitoring() {
                       const val = e.target.value;
                       setSelectedRunId(val === "" ? null : Number(val));
                     }}
-                    className="bg-transparent text-xs font-bold text-slate-600 focus:outline-none min-w-[220px]"
+                    className="min-w-0 w-full bg-transparent text-xs font-bold text-slate-600 focus:outline-none"
                   >
                     <option value="">Hasil Eksekusi Terbaru</option>
                     {historyList.map((run) => (
@@ -912,7 +912,7 @@ export default function Monitoring() {
               <button
                 onClick={handleExportPDF}
                 disabled={isExporting}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-60 sm:w-auto"
               >
                 {isExporting ? <RefreshCw size={13} className="animate-spin" /> : <FileText size={13} />}
                 {isExporting ? "Menyiapkan..." : "Export PDF"}
@@ -921,7 +921,7 @@ export default function Monitoring() {
           </div>
 
           {selectedRunId !== null && meta?.executed_at && (
-            <p className="mt-2 text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+            <p className="mt-2 flex flex-wrap items-center gap-1 text-[10px] font-semibold text-amber-600">
               <History size={10} />
               {selectedRunId} - {formatDateLong(meta.executed_at)}
               {" "}

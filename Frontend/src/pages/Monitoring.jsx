@@ -874,7 +874,7 @@ export default function Monitoring() {
             III. PANEL KONTROL: FILTER + DROPDOWN HISTORY + EXPORT PDF
             ================================================================ */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4">
-          <div className="flex flex-col gap-3 items-start justify-between 2xl:flex-row 2xl:items-center">
+          <div className="flex flex-col items-stretch justify-between gap-3 xl:flex-row xl:items-center xl:flex-nowrap">
 
             <div className="min-w-0 flex-1">
               <QuickFilterCards
@@ -886,9 +886,9 @@ export default function Monitoring() {
               />
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center 2xl:w-auto">
-              <div className="relative w-full sm:flex-1 sm:min-w-[200px] 2xl:w-56 2xl:flex-none">
-                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center xl:w-auto xl:flex-none">
+              <div className="relative w-full sm:flex-1 sm:min-w-[200px] xl:w-52 xl:flex-none">
+                <div className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
                   <History size={12} className="text-slate-400" />
                   <select
                     value={selectedRunId ?? ""}
@@ -896,7 +896,7 @@ export default function Monitoring() {
                       const val = e.target.value;
                       setSelectedRunId(val === "" ? null : Number(val));
                     }}
-                    className="min-w-0 w-full bg-transparent text-xs font-bold text-slate-600 focus:outline-none"
+                    className="min-w-0 w-full bg-transparent text-[10px] font-bold text-slate-600 focus:outline-none"
                   >
                     <option value="">Hasil Eksekusi Terbaru</option>
                     {historyList.map((run) => (
@@ -912,7 +912,7 @@ export default function Monitoring() {
               <button
                 onClick={handleExportPDF}
                 disabled={isExporting}
-                className="inline-flex w-full items-center justify-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-60 sm:w-auto"
+                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 hover:bg-red-700 disabled:opacity-60 sm:w-auto"
               >
                 {isExporting ? <RefreshCw size={13} className="animate-spin" /> : <FileText size={13} />}
                 {isExporting ? "Menyiapkan..." : "Export PDF"}

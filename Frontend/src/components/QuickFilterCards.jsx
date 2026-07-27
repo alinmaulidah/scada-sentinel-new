@@ -17,22 +17,22 @@ export default function QuickFilterCards({ selectedSeverity = "all", onSeverityC
   }), [logs]);
 
   return (
-    <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex-none">
         {SEVERITY_CARDS.map((card) => {
           const Icon = card.icon;
           const isActive = selectedSeverity === card.key;
           return (
-            <button key={card.key} onClick={() => onSeverityChange(card.key)} className={`inline-flex min-h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-bold transition-all active:scale-95 shadow-sm ${isActive ? card.activeColor : card.color}`}>
-              {Icon && <Icon size={13} />}{card.label}
-              <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black ${isActive ? "bg-white/20 text-white" : "bg-white text-slate-500 border border-gray-200"}`}>{counts[card.key]}</span>
+            <button key={card.key} onClick={() => onSeverityChange(card.key)} className={`inline-flex h-9 min-w-[102px] items-center justify-center gap-1 whitespace-nowrap rounded-xl border px-2 py-1 text-[10px] font-bold transition-all active:scale-95 shadow-sm ${isActive ? card.activeColor : card.color}`}>
+              {Icon && <Icon size={12} />}{card.label}
+              <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black ${isActive ? "bg-white/20 text-white" : "bg-white text-slate-500 border border-gray-200"}`}>{counts[card.key]}</span>
             </button>
           );
         })}
       </div>
-      <div className="relative w-full min-w-[200px] xl:w-52 xl:flex-none">
+      <div className="relative w-full min-w-[180px] lg:w-44 lg:flex-none">
         <Search size={13} className="absolute inset-y-0 left-3 my-auto text-slate-400 pointer-events-none" />
-        <input type="text" value={searchSegmentId} onChange={(event) => onSearchChange(event.target.value)} placeholder="Cari Segment ID..." className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
+        <input type="text" value={searchSegmentId} onChange={(event) => onSearchChange(event.target.value)} placeholder="Cari Segment ID..." className="h-9 w-full bg-white py-1 pl-9 pr-8 text-[10px] font-bold text-slate-700 placeholder:text-slate-300 border border-gray-200 rounded-xl focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
         {searchSegmentId && <button onClick={() => onSearchChange("")} className="absolute inset-y-0 right-2.5 text-slate-300 hover:text-slate-500"><X size={13} /></button>}
       </div>
     </div>

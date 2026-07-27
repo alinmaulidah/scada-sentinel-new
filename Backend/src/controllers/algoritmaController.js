@@ -113,7 +113,7 @@ exports.executeAlgorithm = async (req, res) => {
         safeNumber(results.accuracy),
         safeNumber(results.precision),
         safeNumber(results.recall),
-        safeNumber(results.f1_score),
+        safeNumber(results.f1),
         results.status || "Done",
         JSON.stringify(results.anomaly_details || []),
         JSON.stringify(results.normal_details || []),

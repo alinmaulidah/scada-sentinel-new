@@ -898,7 +898,7 @@ export default function Monitoring() {
                     }}
                     className="min-w-0 w-full bg-transparent text-[10px] font-bold text-slate-600 focus:outline-none"
                   >
-                    <option value="">Hasil Eksekusi Terbaru</option>
+                    <option value="">Hasil Eksekusi</option>
                     {historyList.map((run) => (
                       <option key={run.id} value={run.id}>
                         [ID {run.id}] {run.algorithm?.toUpperCase() || "?"} + {getNormLabel(run.normalization)} {formatDateTimeID(run.created_at)}

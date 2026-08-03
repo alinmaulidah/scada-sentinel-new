@@ -28,7 +28,7 @@ function App() {
     useState(false);
 
   const location = useLocation();
-  const activePage = location.pathname.slice(1) || "overview";
+  const activePage = location.pathname.slice(1) || "Dashboard";
 
   useEffect(() => {
     applyTheme(getAppSettings().darkMode);
@@ -106,7 +106,7 @@ function App() {
             <Routes>
 
               <Route
-                path="/overview"
+                path="/Dashboard"
                 element={<Dashboard />}
               />
 
@@ -144,12 +144,12 @@ function App() {
 
               <Route
                 path="/"
-                element={<Navigate to="/overview" />}
+                element={<Navigate to="/Dashboard" />}
               />
 
               <Route
                 path="*"
-                element={<Navigate to="/overview" />}
+                element={<Navigate to="/Dashboard" />}
               />
 
             </Routes>

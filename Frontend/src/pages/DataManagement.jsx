@@ -124,7 +124,7 @@ const DataManagement = () => {
   const formatValue = (value) => {
     const number = Number(value);
     return Number.isFinite(number)
-      ? number.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 6 })
+      ? number.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 2 })
       : "-";
   };
 

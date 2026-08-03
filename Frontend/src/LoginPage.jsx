@@ -97,7 +97,7 @@ function Login({ onLogin }) {
 
       onLogin(true);
 
-      navigate("/overview");
+      navigate("/Dashboard");
 
     } catch (error) {
 

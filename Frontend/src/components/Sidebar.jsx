@@ -14,7 +14,7 @@ const Sidebar = ({ isOpen, toggleSidebar, activePage, onLogin }) => {
   // ID Menu di sini harus 100% SAMA dengan properti 'path' di App.jsx
   const allMenuItems = [
     {
-      id: "overview",
+      id: "Dashboard",
       label: "Dashboard",
       icon: <LayoutDashboard size={20} />
     },

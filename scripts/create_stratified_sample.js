@@ -2,8 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const XLSX = require("../Frontend/node_modules/xlsx");
 
-const sourcePath = path.resolve(__dirname, "..", "dataset-pipeline.xlsx");
-const outputPath = path.resolve(__dirname, "..", "scada_stratified_500_seed42.xlsx");
+const sourcePath = path.resolve(__dirname, "..", "scada-pipeline.xlsx");
+const outputPath = path.resolve(__dirname, "..", "scada_stratified_500_seed42_new.xlsx");
 const sampleSize = 500;
 const seed = 42;
 

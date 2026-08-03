@@ -167,17 +167,7 @@ const Header = ({ activePage, onLogin, onToggleSidebar }) => {
 
           </div>
 
-          {/* STATUS */}
-
-          <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-2xl border border-emerald-100">
-
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
-
-            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">
-              Mode Penelitian
-            </span>
-
-          </div>
+          
 
           {/* PROFILE AREA */}
 

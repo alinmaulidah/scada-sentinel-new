@@ -38,16 +38,12 @@ const WORKFLOW_STEPS = [
     Icon: Database,
     path: "/datamanagement",
     action: "Buka Data Management",
-    summary: "Dataset SCADA diimpor sebelum digunakan oleh algoritma.",
-    input: "Berkas .csv atau .xlsx berisi observasi sensor dan atribut pendukung.",
-    process: "Sistem memeriksa format, nilai sensor, status biner, timestamp, dan segment ID sebelum menyimpan data.",
-    output: "Data valid tersimpan sebagai log sensor dan siap dipilih pada tahap eksekusi.",
-    details: [
-      "Empat sensor utama: pressure, flow rate, temperature, dan pump speed.",
-      "Atribut konteks seperti valve_status, pump_state, event_type, dan target tetap disimpan.",
-      "Sampel stratified untuk demo dibuat di luar website; website hanya mengimpor dan memvalidasi hasilnya.",
-    ],
-    note: "Gunakan data berurutan untuk membahas tren waktu. Sampel acak tidak cukup untuk membuktikan surge atau degradation sebagai tren kontinu.",
+    summary: "Dataset SCADA Pipa diimpor sebelum melakukan Algorithma Execution.",
+    Langkah: "Unggah berkas dataset SCADA berformat .csv atau .xlsx.",
+    CaraKerja: "Sistem secara otomatis memvalidasi format, rentang nilai sensor, timestamp, dan segment ID.",
+    Hasil: "Data dinyatakan valid dan tersimpan sebagai log sensor yang siap dianalisis.",
+    
+    note: "Import dataset yang sudah dilakukan sample"
   },
   {
     step: 2,
@@ -57,9 +53,9 @@ const WORKFLOW_STEPS = [
     path: "/algorithmexecution",
     action: "Buka Algorithm Execution",
     summary: "Empat fitur sensor dinormalisasi lalu diproses oleh K-Means atau DBSCAN.",
-    input: "Log sensor yang telah tervalidasi serta pilihan algoritma dan normalisasi.",
-    process: "K-Means mengukur kedekatan terhadap centroid; DBSCAN menandai noise berdasarkan kepadatan tetangga.",
-    output: "Riwayat eksekusi berisi konfigurasi, metrik, observasi normal, dan observasi anomali.",
+    Langkah: "Pilih parameter sensor, tentukan algoritma (K-Means atau DBSCAN), kemudian pilih Normalisasi (Min-Max atau Z-score) lalu jalankan analisis.",
+    CaraKerja: "Sistem menormalisasi data, menghitung jarak (K-Means) atau tingkat kerapatan (DBSCAN).",
+    Hasil: "Riwayat eksekusi lengkap dengan metrik evaluasi serta pengelompokan data normal dan anomali.",
     details: [
       "Fitur model: pressure, flow rate, temperature, dan pump speed.",
       "Normalisasi dilakukan sebelum perhitungan jarak atau kepadatan.",
@@ -75,33 +71,28 @@ const WORKFLOW_STEPS = [
     path: "/monitoring",
     action: "Buka Monitoring",
     summary: "Hasil eksekusi diterjemahkan menjadi log, tren sensor, indikasi pola, dan rekomendasi pemeriksaan.",
-    input: "Riwayat eksekusi algoritma terbaru atau riwayat yang dipilih pengguna.",
-    process: "Pengguna menyaring observasi, membuka detail, lalu membaca indikasi pressure–flow bersama empat nilai sensor.",
-    output: "Detail observasi, rekomendasi tindak lanjut berbasis indikasi, dan laporan PDF hasil filter.",
-    details: [
-      "Surge, leak, dan blockage ditampilkan sebagai pola pressure–flow pada dataset penelitian.",
-      "Temperature dan pump speed tetap ditampilkan sebagai konteks pemeriksaan, walaupun bukan aturan pada peta pola.",
-      "Rekomendasi membantu prioritas verifikasi; bukan perintah maintenance otomatis atau diagnosis fisik.",
-    ],
-    note: "Gunakan detail observasi untuk menjelaskan dasar klasifikasi, dampak potensial, dan langkah verifikasi saat sidang.",
+    Langkah: "Pilih riwayat eksekusi, lakukan filtering data, dan amati tren sensor.",
+    CaraKerja: "Sistem menerjemahkan hasil klaster menjadi pola pressure - flow untuk mendeteksi indikasi anomali seperti leak, surge, atau blockage.",
+    Hasil: "Detail observasi, rekomendasi prioritas pemeriksaan, dan unduh laporan dalam format PDF.",
+    note: "Label anomali sesuai menggunakan peta indikasi presure"
   },
   {
     step: 4,
     label: "Dashboard",
     phase: "Evaluasi & Rekapitulasi",
     Icon: LayoutDashboard,
-    path: "/overview",
+    path: "/Dashboard",
     action: "Kembali ke Dashboard",
     summary: "Riwayat eksperimen dibandingkan agar konfigurasi model dapat dibaca secara transparan.",
-    input: "Metrik dan konfigurasi dari seluruh riwayat Algorithm Execution serta jumlah data yang diimpor.",
-    process: "Dashboard mengurutkan eksperimen berdasarkan Silhouette Score dan menampilkan metrik pembanding.",
-    output: "Matriks komparasi, grafik hubungan jumlah anomali–Silhouette, dan ringkasan konfigurasi.",
+    Langkah: "Buka menu dashboard utama untuk melihat perbandingan seluruh eksperimen model.",
+    CaraKerja: "Sistem menyusun peringkat konfigurasi model berdasarkan metrik evaluasi terbaik (seperti Silhouette Score, Davies Bouldin.",
+    Hasil: "Matriks komparasi, grafik perbandingan anomali, dan ringkasan konfigurasi model secara transparan.",
     details: [
       "Konfigurasi dengan Silhouette tertinggi adalah ringkasan struktur internal terbaik pada data tersebut.",
       "Silhouette tertinggi tidak otomatis berarti performa keseluruhan atau kesiapan operasional terbaik.",
       "Gunakan Accuracy, Precision, Recall, F1 Score, dan Davies-Bouldin sebagai pembanding.",
     ],
-    note: "Dashboard merangkum eksperimen; keputusan domain tetap membutuhkan verifikasi terhadap konteks data dan tujuan penelitian.",
+    note: "Hasil perbandingan algoritma yang ebih baik bisa di lihat di dashboard ",
   },
 ];
 
@@ -243,7 +234,6 @@ export default function Dashboard() {
               <HelpCircle size={18} style={{ color: PRIMARY_COLOR }} />
               <div>
                 <h2 className="text-xs font-black text-slate-800 tracking-wide uppercase">Alur Kerja Sistem</h2>
-                <p className="text-[10px] text-slate-400">Data → Model → Monitoring → Evaluasi</p>
               </div>
             </div>
             <button 
@@ -292,9 +282,9 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                       {[
-                        ["Input", activeWorkflow.input],
-                        ["Proses Sistem", activeWorkflow.process],
-                        ["Keluaran", activeWorkflow.output],
+                        ["Langkah", activeWorkflow.Langkah],
+                        ["Cara Kerja", activeWorkflow.CaraKerja],
+                        ["Hasil", activeWorkflow.Hasil],
                       ].map(([label, value]) => (
                         <div key={label} className="rounded-lg border border-slate-200 bg-white p-2.5">
                           <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</p>
@@ -302,11 +292,7 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
-                    <ul className="mt-3 grid grid-cols-1 gap-1.5 text-[11px] leading-relaxed text-slate-600 sm:grid-cols-2">
-                      {activeWorkflow.details.map((detail) => (
-                        <li key={detail} className="flex gap-2"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-[#336B87]" />{detail}</li>
-                      ))}
-                    </ul>
+                    
                     <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5 text-[10px] leading-relaxed text-blue-800"><Info size={12} className="mr-1 inline" />{activeWorkflow.note}</p>
 
                     {activeWorkflow.step === 1 && (
@@ -330,7 +316,7 @@ export default function Dashboard() {
                               </div>
                               <div className="rounded-lg bg-slate-50 p-2.5">
                                 <strong className="block text-[10px] uppercase tracking-wider text-slate-800">2. Pengambilan</strong>
-                                Sebanyak 500 baris dipilih dengan random stratified sampling berdasarkan <code>event_type</code>. Kuota tiap kelas proporsional; sisa pembulatan diberikan pada pecahan kuota terbesar.
+                                Sebanyak 500 baris dipilih dengan random stratified sampling berdasarkan <code>event_type</code>. Kuota tiap kelas proporsional, sia pembulatan diberikan pada pecahan kuota terbesar.
                               </div>
                               <div className="rounded-lg bg-slate-50 p-2.5">
                                 <strong className="block text-[10px] uppercase tracking-wider text-slate-800">3. Replikasi</strong>
@@ -484,7 +470,7 @@ export default function Dashboard() {
 
           <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs flex flex-col justify-between min-h-[105px]">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Anomalies</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Anomali</span>
               <AlertTriangle size={16} className={best?.anomaly > 0 ? "text-red-500" : "text-slate-300"} />
             </div>
             <div className={`text-2xl font-black font-mono mt-1 ${best?.anomaly > 0 ? "text-red-500" : "text-slate-800"}`}>
@@ -497,7 +483,7 @@ export default function Dashboard() {
 
           <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs flex flex-col justify-between min-h-[105px]">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dataset Volume</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dataset</span>
               <Database size={16} style={{ color: PRIMARY_COLOR }} />
             </div>
             <div className="text-2xl font-black text-slate-800 font-mono mt-1">
@@ -510,7 +496,7 @@ export default function Dashboard() {
 
           <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs flex flex-col justify-between min-h-[105px]">
             <div className="flex justify-between items-start">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Experiment Iteration</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jumlah Iterasi</span>
               <Activity size={16} className="text-indigo-400" />
             </div>
             <div className="text-2xl font-black text-slate-700 font-mono mt-1">
@@ -593,7 +579,7 @@ export default function Dashboard() {
 <div className="grid grid-cols-3 gap-2 text-xs">
   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
     <span className="text-[9px] text-slate-400 font-extrabold uppercase block tracking-wider">
-      Silhouette Score
+      Skor Silhouette Tertinggi
     </span>
     <span className="font-black text-blue-600 font-mono text-sm">
       {(best.score).toFixed(3)}
@@ -673,7 +659,7 @@ export default function Dashboard() {
                 className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-100/70 transition-colors"
               >
                 <Trash2 size={13} />
-                Wipe History
+                Hapus Semua
               </button>
             </div>
           </div>
